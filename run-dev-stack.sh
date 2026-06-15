@@ -14,21 +14,45 @@ fi
 backend_pid=""
 frontend_pid=""
 
+# Print a PID followed by all of its descendants (depth-first), so that the
+# whole process tree can be signalled even after children get reparented.
+collect_tree() {
+  local pid="$1"
+  local child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do
+    collect_tree "$child"
+  done
+  echo "$pid"
+}
+
 cleanup() {
   trap - INT TERM EXIT
 
-  if [ -n "$backend_pid" ] && kill -0 "$backend_pid" 2>/dev/null; then
-    kill "$backend_pid" 2>/dev/null || true
-  fi
+  local pids=()
+  local root
+  for root in "$backend_pid" "$frontend_pid"; do
+    if [ -n "$root" ] && kill -0 "$root" 2>/dev/null; then
+      pids+=($(collect_tree "$root"))
+    fi
+  done
 
-  if [ -n "$frontend_pid" ] && kill -0 "$frontend_pid" 2>/dev/null; then
-    kill "$frontend_pid" 2>/dev/null || true
+  if [ "${#pids[@]}" -gt 0 ]; then
+    kill -TERM "${pids[@]}" 2>/dev/null || true
+    sleep 1
+    kill -KILL "${pids[@]}" 2>/dev/null || true
   fi
 
   wait "$backend_pid" "$frontend_pid" 2>/dev/null || true
 }
 
 trap cleanup INT TERM EXIT
+
+# Fail fast if the backend port is occupied; otherwise uvicorn dies on bind and
+# the watch loop tears everything down again, leaving orphaned dev servers.
+if lsof -nP -iTCP:8000 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Error: port 8000 is already in use. Stop that process and retry." >&2
+  exit 1
+fi
 
 if [ ! -x "$BACKEND_DIR/.venv/bin/python" ]; then
   echo "Creating backend virtual environment..."
