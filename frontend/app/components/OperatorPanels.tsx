@@ -44,7 +44,7 @@ type MissionControlsProps = {
 
 type DebugPanelProps = {
   logs: LogEntry[];
-  missionFilesPath: string | null;
+  missionFiles: MissionFiles | null;
   missionFilesSaved: boolean;
   navigationReady: boolean;
   navigationRunning: boolean;
@@ -56,10 +56,9 @@ type DebugPanelProps = {
   processPids: Record<ProcessName, number | null>;
   processStatuses: Record<ProcessName, ProcessStatus>;
   robotReady: boolean;
-  rosPayloadJson: string;
   sprayCheckAccepted: boolean;
   onRemoveObstacle: (id: string) => void;
-  onCopyRosPayload: () => void;
+  onRevealMissionFile: (kind: MissionFileKind) => void;
   onSaveMissionFiles: () => void;
   onSendRobotReady: () => void;
   onSprayCheckChange: (accepted: boolean) => void;
@@ -71,6 +70,8 @@ type DebugPanelProps = {
 
 type ProcessStatus = "unknown" | "running" | "stopping" | "stopped" | "error";
 type ProcessName = "localization" | "navigation";
+type MissionFileKind = "waypoints" | "obstacles";
+type MissionFiles = Record<MissionFileKind, string>;
 
 type ProcessLogLine = {
   id: number;
@@ -154,7 +155,7 @@ export function MissionControls({
 
 export function DebugPanel({
   logs,
-  missionFilesPath,
+  missionFiles,
   missionFilesSaved,
   navigationReady,
   navigationRunning,
@@ -166,10 +167,9 @@ export function DebugPanel({
   processPids,
   processStatuses,
   robotReady,
-  rosPayloadJson,
   sprayCheckAccepted,
   onRemoveObstacle,
-  onCopyRosPayload,
+  onRevealMissionFile,
   onSaveMissionFiles,
   onSendRobotReady,
   onSprayCheckChange,
@@ -185,7 +185,7 @@ export function DebugPanel({
         error={processError}
         exitCodes={processExitCodes}
         logs={processLogs}
-        missionFilesPath={missionFilesPath}
+        missionFiles={missionFiles}
         missionFilesSaved={missionFilesSaved}
         navigationReady={navigationReady}
         navigationRunning={navigationRunning}
@@ -193,6 +193,7 @@ export function DebugPanel({
         robotReady={robotReady}
         sprayCheckAccepted={sprayCheckAccepted}
         statuses={processStatuses}
+        onRevealMissionFile={onRevealMissionFile}
         onSaveMissionFiles={onSaveMissionFiles}
         onSendRobotReady={onSendRobotReady}
         onSprayCheckChange={onSprayCheckChange}
@@ -208,23 +209,6 @@ export function DebugPanel({
           <h2>ROS coordinates</h2>
         </div>
         <ObstacleList obstacles={obstacleBoxes} onRemove={onRemoveObstacle} />
-      </section>
-
-      <section className="panel-section">
-        <div className="section-heading export-heading">
-          <div>
-            <p className="eyebrow">Debug export</p>
-            <h2>ROS JSON</h2>
-          </div>
-          <button
-            type="button"
-            className="secondary-button small-button"
-            onClick={onCopyRosPayload}
-          >
-            Copy
-          </button>
-        </div>
-        <pre className="json-output">{rosPayloadJson}</pre>
       </section>
 
       <section className="panel-section">
@@ -250,7 +234,7 @@ function RobotWorkflowPanel({
   error,
   exitCodes,
   logs,
-  missionFilesPath,
+  missionFiles,
   missionFilesSaved,
   navigationReady,
   navigationRunning,
@@ -258,6 +242,7 @@ function RobotWorkflowPanel({
   robotReady,
   sprayCheckAccepted,
   statuses,
+  onRevealMissionFile,
   onSaveMissionFiles,
   onSendRobotReady,
   onSprayCheckChange,
@@ -270,7 +255,7 @@ function RobotWorkflowPanel({
   error: string | null;
   exitCodes: Record<ProcessName, number | null>;
   logs: ProcessLogLine[];
-  missionFilesPath: string | null;
+  missionFiles: MissionFiles | null;
   missionFilesSaved: boolean;
   navigationReady: boolean;
   navigationRunning: boolean;
@@ -278,6 +263,7 @@ function RobotWorkflowPanel({
   robotReady: boolean;
   sprayCheckAccepted: boolean;
   statuses: Record<ProcessName, ProcessStatus>;
+  onRevealMissionFile: (kind: MissionFileKind) => void;
   onSaveMissionFiles: () => void;
   onSendRobotReady: () => void;
   onSprayCheckChange: (accepted: boolean) => void;
@@ -380,10 +366,25 @@ function RobotWorkflowPanel({
         </li>
       </ol>
 
-      {missionFilesSaved && (
-        <p className="helper-text">
-          Mission JSON saved{missionFilesPath ? `: ${missionFilesPath}` : "."}
-        </p>
+      {missionFilesSaved && missionFiles && (
+        <div className="mission-file-list" aria-label="Saved mission JSON files">
+          <button
+            type="button"
+            className="file-reveal-button"
+            onClick={() => onRevealMissionFile("waypoints")}
+          >
+            <span>Waypoints JSON</span>
+            <code>{missionFiles.waypoints}</code>
+          </button>
+          <button
+            type="button"
+            className="file-reveal-button"
+            onClick={() => onRevealMissionFile("obstacles")}
+          >
+            <span>Obstacles JSON</span>
+            <code>{missionFiles.obstacles}</code>
+          </button>
+        </div>
       )}
 
       {error && (

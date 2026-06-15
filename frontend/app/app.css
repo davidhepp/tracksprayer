@@ -1049,6 +1049,46 @@ button {
   accent-color: #24755f;
 }
 
+.mission-file-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.file-reveal-button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 5px;
+  border: 1px solid #d1dbd5;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #f6f8f5;
+  color: #17211d;
+  text-align: left;
+}
+
+.file-reveal-button:hover {
+  background: #eef4ef;
+}
+
+.file-reveal-button span {
+  color: #17624e;
+  font-size: 0.74rem;
+  font-weight: 820;
+}
+
+.file-reveal-button code {
+  min-width: 0;
+  color: #29352f;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .process-log {
   display: grid;
   gap: 0;
@@ -1096,28 +1136,6 @@ button {
 .process-log .empty-log {
   display: block;
   color: #8fb7a7;
-}
-
-.export-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.json-output {
-  overflow: auto;
-  max-height: 360px;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid #cfd9d3;
-  border-radius: 8px;
-  background: #101715;
-  color: #d7f1e7;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.72rem;
-  line-height: 1.45;
-  white-space: pre;
 }
 
 .obstacle-list {

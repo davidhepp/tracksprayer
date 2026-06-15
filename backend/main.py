@@ -1,6 +1,9 @@
 import asyncio
 import json
-from typing import Any
+import platform
+import subprocess
+from pathlib import Path
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +38,10 @@ app.add_middleware(
 class MissionFilesRequest(BaseModel):
     waypoints: list[dict]
     obstacles: list[dict]
+
+
+class MissionFileRevealRequest(BaseModel):
+    kind: Literal["waypoints", "obstacles"]
 
 
 async def _start_process(name: str) -> dict[str, bool | str]:
@@ -97,6 +104,24 @@ async def save_mission_files(payload: MissionFilesRequest) -> dict[str, bool | s
         "waypoints_file": str(WAYPOINTS_FILE),
         "obstacles_file": str(OBSTACLES_FILE),
     }
+
+
+@app.post("/mission/files/reveal")
+async def reveal_mission_file(payload: MissionFileRevealRequest) -> dict[str, bool | str]:
+    path = WAYPOINTS_FILE if payload.kind == "waypoints" else OBSTACLES_FILE
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Mission file not found: {path}")
+
+    try:
+        _reveal_path(path)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not reveal mission file: {exc}",
+        ) from exc
+
+    return {"ok": True, "path": str(path)}
 
 
 @app.post("/robot/ready")
@@ -168,6 +193,20 @@ def _is_robot_ready_message(message: Any) -> bool:
 
     msg = message.get("msg")
     return isinstance(msg, dict) and msg.get("data") is True
+
+
+def _reveal_path(path: Path) -> None:
+    system = platform.system()
+
+    if system == "Darwin":
+        subprocess.Popen(["open", "-R", str(path)])
+        return
+
+    if system == "Windows":
+        subprocess.Popen(["explorer", f"/select,{path}"])
+        return
+
+    subprocess.Popen(["xdg-open", str(path.parent)])
 
 
 @app.websocket("/ws/process")

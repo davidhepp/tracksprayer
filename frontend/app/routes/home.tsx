@@ -66,6 +66,8 @@ const initialTrack = {
 
 type ProcessStatus = "unknown" | "running" | "stopping" | "stopped" | "error";
 type ProcessName = "localization" | "navigation";
+type MissionFileKind = "waypoints" | "obstacles";
+type MissionFiles = Record<MissionFileKind, string>;
 
 type ProcessLogLine = {
   id: number;
@@ -162,7 +164,7 @@ export default function Home() {
   const [robotReady, setRobotReady] = useState(false);
   const [sprayCheckAccepted, setSprayCheckAccepted] = useState(false);
   const [missionFilesSaved, setMissionFilesSaved] = useState(false);
-  const [missionFilesPath, setMissionFilesPath] = useState<string | null>(null);
+  const [missionFiles, setMissionFiles] = useState<MissionFiles | null>(null);
 
   const addLog = useCallback(
     (
@@ -373,14 +375,6 @@ export default function Home() {
     dragState?.type === "obstacle"
       ? pointsToRect(dragState.startPoint, dragState.currentPoint)
       : null;
-  const rosPayload = useMemo(
-    () => buildRosPayload(track, trackScale, previewConeWaypoints, obstacleBoxes),
-    [obstacleBoxes, previewConeWaypoints, track, trackScale],
-  );
-  const rosPayloadJson = useMemo(
-    () => JSON.stringify(rosPayload, null, 2),
-    [rosPayload],
-  );
   const localizationRunning = processStatuses.localization === "running";
   const navigationRunning = processStatuses.navigation === "running";
   const missionLocked = !localizationRunning;
@@ -629,17 +623,6 @@ export default function Home() {
     addLog("info", "Obstacle rectangle removed.", { id });
   };
 
-  const copyRosPayload = async () => {
-    try {
-      await navigator.clipboard.writeText(rosPayloadJson);
-      addLog("info", "ROS debug JSON copied to clipboard.");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Clipboard copy failed.";
-      addLog("warn", message);
-    }
-  };
-
   const startProcess = async (name: ProcessName) => {
     try {
       const response = await fetch(
@@ -690,7 +673,7 @@ export default function Home() {
         if (name === "localization") {
           setRobotReady(false);
           setMissionFilesSaved(false);
-          setMissionFilesPath(null);
+          setMissionFiles(null);
         }
       }
       setProcessError(null);
@@ -766,7 +749,10 @@ export default function Home() {
       };
       setConeWaypoints(waypoints);
       setMissionFilesSaved(true);
-      setMissionFilesPath(result.waypoints_file);
+      setMissionFiles({
+        waypoints: result.waypoints_file,
+        obstacles: result.obstacles_file,
+      });
       setProcessError(null);
       addLog("info", "Mission JSON written for navigation.", result);
     } catch (error) {
@@ -780,7 +766,30 @@ export default function Home() {
 
   const invalidateMissionFiles = () => {
     setMissionFilesSaved(false);
-    setMissionFilesPath(null);
+    setMissionFiles(null);
+  };
+
+  const revealMissionFile = async (kind: MissionFileKind) => {
+    try {
+      const response = await fetch(`${BACKEND_HTTP_BASE_URL}/mission/files/reveal`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ kind }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Reveal failed with ${response.status}.`);
+      }
+
+      const result = (await response.json()) as { path: string };
+      addLog("info", `Revealed ${kind} JSON.`, result);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Mission file reveal failed.";
+      addLog("warn", message);
+    }
   };
 
   const changeZoom = (
@@ -1009,7 +1018,7 @@ export default function Home() {
 
         <DebugPanel
           logs={logs}
-          missionFilesPath={missionFilesPath}
+          missionFiles={missionFiles}
           missionFilesSaved={missionFilesSaved}
           navigationReady={navigationReady}
           navigationRunning={navigationRunning}
@@ -1021,9 +1030,8 @@ export default function Home() {
           processPids={processPids}
           processStatuses={processStatuses}
           robotReady={robotReady}
-          rosPayloadJson={rosPayloadJson}
           sprayCheckAccepted={sprayCheckAccepted}
-          onCopyRosPayload={copyRosPayload}
+          onRevealMissionFile={revealMissionFile}
           onSaveMissionFiles={saveMissionFiles}
           onSendRobotReady={sendRobotReady}
           onSprayCheckChange={setSprayCheckAccepted}
