@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 
+import { InfoTooltip } from "../components/InfoTooltip";
 import { TrackPreview } from "../components/TrackPreview";
 import {
   DISCIPLINE_LABELS,
@@ -434,7 +435,34 @@ export default function Tracks() {
             </div>
 
             <label className="field-control">
-              <span>Discipline</span>
+              <span className="field-label">
+                Discipline
+                <InfoTooltip label="Explain trackdrive vs. autocross">
+                  <strong>Trackdrive vs. Autocross</strong>
+                  <p>
+                    Both are closed driverless handling circuits and share the
+                    same geometry limits: min. track width 3 m, min. turn
+                    diameter 9 m (radius 4.5 m), straights ≤ 80 m, max. cone
+                    spacing 5 m (tighter in corners).
+                  </p>
+                  <p>
+                    <span className="info-tooltip-term">Trackdrive (D8)</span>{" "}
+                    Closed loop, one lap ≈ 200–500 m, driven for 10 laps
+                    (endurance). The generator keeps lap length within 200–500 m.
+                  </p>
+                  <p>
+                    <span className="info-tooltip-term">Autocross (D6)</span> A
+                    single timed lap (sprint); the layout may be larger/longer
+                    (up to ~1.5 km), built to the same Trackdrive guidelines
+                    (D8.1). The generator therefore allows larger areas.
+                  </p>
+                  <p>
+                    In short: the difference here is track size / lap length and
+                    event format (1 lap vs. 10 laps) — the geometry rules are
+                    identical.
+                  </p>
+                </InfoTooltip>
+              </span>
               <select
                 value={discipline}
                 onChange={(event) =>
@@ -496,7 +524,25 @@ export default function Tracks() {
                   onChange={setMaxBound}
                 />
                 <label className="field-control">
-                  <span>Shape mode</span>
+                  <span className="field-label">
+                    Shape mode
+                    <InfoTooltip label="Explain the shape modes">
+                      <strong>Shape modes</strong>
+                      <p>
+                        <span className="info-tooltip-term">expand</span> Picks
+                        neighbouring Voronoi regions around a start point →
+                        rounded, compact tracks.
+                      </p>
+                      <p>
+                        <span className="info-tooltip-term">extend</span> Picks
+                        regions along a line → elongated tracks.
+                      </p>
+                      <p>
+                        <span className="info-tooltip-term">random</span> Picks
+                        regions at random → large, irregular tracks.
+                      </p>
+                    </InfoTooltip>
+                  </span>
                   <select
                     value={mode}
                     onChange={(event) =>

@@ -1527,6 +1527,90 @@ button {
   line-height: 1.35;
 }
 
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-tooltip-trigger {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid #b8c5bc;
+  border-radius: 999px;
+  background: #f6f8f5;
+  color: #4b5a52;
+  font-size: 0.72rem;
+  font-weight: 820;
+  font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1;
+}
+
+.info-tooltip-trigger:hover {
+  border-color: #24755f;
+  background: #e4f4ee;
+  color: #17624e;
+}
+
+.info-tooltip-trigger:focus-visible {
+  border-color: #24755f;
+  outline: 2px solid rgba(36, 117, 95, 0.18);
+}
+
+.info-tooltip-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: none;
+  width: max-content;
+  max-width: min(320px, 78vw);
+  padding: 12px 14px;
+  border: 1px solid #cdd8d1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #29352f;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: 0 16px 32px rgba(32, 47, 40, 0.16);
+}
+
+.info-tooltip-popover.is-open {
+  display: block;
+}
+
+.info-tooltip-popover strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #111915;
+  font-size: 0.84rem;
+  font-weight: 760;
+}
+
+.info-tooltip-popover p {
+  margin: 6px 0 0;
+}
+
+.info-tooltip-popover p:first-of-type {
+  margin-top: 0;
+}
+
+.info-tooltip-term {
+  font-weight: 760;
+  color: #17624e;
+}
+
 @media (max-width: 1180px) {
   .tracks-workspace {
     grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
