@@ -1,0 +1,13 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Node / frontend
+frontend/node_modules/
+frontend/build/
+frontend/.react-router/
+
+# User-generated tracks (keep the folder via .gitkeep)
+backend/tracks/generated/*
+!backend/tracks/generated/.gitkeep

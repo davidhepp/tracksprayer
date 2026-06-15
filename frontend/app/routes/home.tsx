@@ -9,6 +9,8 @@ import {
   type PointerEvent,
 } from "react";
 
+import { Link } from "react-router";
+
 import { DebugPanel, MissionControls } from "../components/OperatorPanels";
 import { TrackMap } from "../components/TrackMap";
 import { createLogEntry, writeConsoleLog } from "../lib/logger";
@@ -959,9 +961,17 @@ export default function Home() {
           <p className="eyebrow">Formula Student ROS frontend</p>
           <h1>TrackSprayer Operator</h1>
         </div>
-        <div className="spray-status" aria-label="Spray can level">
-          <span>Spray can</span>
-          <strong>100%</strong>
+        <div className="topbar-aside">
+          <nav className="page-nav" aria-label="Primary">
+            <Link to="/" className="is-active" aria-current="page">
+              Operator
+            </Link>
+            <Link to="/tracks">Tracks</Link>
+          </nav>
+          <div className="spray-status" aria-label="Spray can level">
+            <span>Spray can</span>
+            <strong>100%</strong>
+          </div>
         </div>
       </header>
 

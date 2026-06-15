@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from process_manager import process_manager
+from track_generation.router import router as tracks_router
 from settings import (
     OBSTACLES_FILE,
     ROSBRIDGE_READY_TOPIC,
@@ -33,6 +34,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(tracks_router)
 
 
 class MissionFilesRequest(BaseModel):
