@@ -44,9 +44,25 @@ type MissionControlsProps = {
 type DebugPanelProps = {
   logs: LogEntry[];
   obstacleBoxes: ObstacleBox[];
+  processConnection: "connecting" | "connected" | "disconnected";
+  processError: string | null;
+  processExitCode: number | null;
+  processLogs: ProcessLogLine[];
+  processPid: number | null;
+  processStatus: ProcessStatus;
   rosPayloadJson: string;
   onRemoveObstacle: (id: string) => void;
   onCopyRosPayload: () => void;
+  onStartProcess: () => void;
+  onStopProcess: () => void;
+};
+
+type ProcessStatus = "unknown" | "running" | "stopping" | "stopped" | "error";
+
+type ProcessLogLine = {
+  id: number;
+  level: "stdout" | "stderr";
+  message: string;
 };
 
 export function MissionControls({
@@ -120,9 +136,17 @@ export function MissionControls({
 export function DebugPanel({
   logs,
   obstacleBoxes,
+  processConnection,
+  processError,
+  processExitCode,
+  processLogs,
+  processPid,
+  processStatus,
   rosPayloadJson,
   onRemoveObstacle,
   onCopyRosPayload,
+  onStartProcess,
+  onStopProcess,
 }: DebugPanelProps) {
   return (
     <aside className="control-panel right-panel" aria-label="Available data and logs">
@@ -135,6 +159,17 @@ export function DebugPanel({
         <UnavailableData label="Spray can" />
         <UnavailableData label="ROS bridge" />
       </section>
+
+      <ProcessDemoPanel
+        connection={processConnection}
+        error={processError}
+        exitCode={processExitCode}
+        logs={processLogs}
+        pid={processPid}
+        status={processStatus}
+        onStart={onStartProcess}
+        onStop={onStopProcess}
+      />
 
       <section className="panel-section">
         <div className="section-heading">
@@ -176,6 +211,93 @@ export function DebugPanel({
         </ol>
       </section>
     </aside>
+  );
+}
+
+function ProcessDemoPanel({
+  connection,
+  error,
+  exitCode,
+  logs,
+  pid,
+  status,
+  onStart,
+  onStop,
+}: {
+  connection: "connecting" | "connected" | "disconnected";
+  error: string | null;
+  exitCode: number | null;
+  logs: ProcessLogLine[];
+  pid: number | null;
+  status: ProcessStatus;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  const isRunning = status === "running" || status === "stopping";
+
+  return (
+    <section className="panel-section">
+      <div className="section-heading process-heading">
+        <div>
+          <p className="eyebrow">Backend demo</p>
+          <h2>Process monitor</h2>
+        </div>
+        <span className={`process-pill ${status}`}>{status}</span>
+      </div>
+
+      <dl className="process-state-grid">
+        <div>
+          <dt>WebSocket</dt>
+          <dd>{connection}</dd>
+        </div>
+        <div>
+          <dt>PID</dt>
+          <dd>{pid ?? "none"}</dd>
+        </div>
+        <div>
+          <dt>Exit</dt>
+          <dd>{exitCode ?? "none"}</dd>
+        </div>
+      </dl>
+
+      <div className="button-row compact-buttons">
+        <button
+          type="button"
+          className="primary-button"
+          disabled={isRunning}
+          onClick={onStart}
+        >
+          Start demo
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={!isRunning}
+          onClick={onStop}
+        >
+          Stop
+        </button>
+      </div>
+
+      {error && (
+        <p className="process-error" role="status">
+          {error}
+        </p>
+      )}
+
+      <ol className="process-log" aria-label="Demo process log output">
+        {logs.length === 0 ? (
+          <li className="empty-log">No process output yet.</li>
+        ) : (
+          logs.map((line) => (
+            <li key={line.id} className={line.level}>
+              <span>{line.level}</span>
+              <code>{line.message}</code>
+            </li>
+          ))
+        )}
+      </ol>
+    </section>
   );
 }
 

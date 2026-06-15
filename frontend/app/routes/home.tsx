@@ -56,10 +56,43 @@ import {
 } from "../lib/trackGeometry";
 import type { Route } from "./+types/home";
 
+const BACKEND_HTTP_BASE_URL =
+  import.meta.env.VITE_ROBOT_BACKEND_URL ?? "http://localhost:8000";
+
 const initialTrack = {
   center: SCHWEINFURT_CENTER,
   rotation: 0,
 } satisfies TrackPlacement;
+
+type ProcessStatus = "unknown" | "running" | "stopping" | "stopped" | "error";
+
+type ProcessLogLine = {
+  id: number;
+  level: "stdout" | "stderr";
+  message: string;
+};
+
+type ProcessSocketMessage =
+  | {
+      type: "status";
+      status: "running" | "stopping" | "stopped";
+      pid?: number;
+      exit_code?: number;
+    }
+  | {
+      type: "log";
+      level: "stdout" | "stderr";
+      message: string;
+    };
+
+function backendWsUrl() {
+  const url = new URL(BACKEND_HTTP_BASE_URL);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws/process";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -91,6 +124,15 @@ export default function Home() {
   const [logs, setLogs] = useState([
     createLogEntry("info", "Map initialized at Schweinfurt, Germany.", 1),
   ]);
+  const [processStatus, setProcessStatus] =
+    useState<ProcessStatus>("unknown");
+  const [processPid, setProcessPid] = useState<number | null>(null);
+  const [processExitCode, setProcessExitCode] = useState<number | null>(null);
+  const [processLogs, setProcessLogs] = useState<ProcessLogLine[]>([]);
+  const [processConnection, setProcessConnection] = useState<
+    "connecting" | "connected" | "disconnected"
+  >("disconnected");
+  const [processError, setProcessError] = useState<string | null>(null);
 
   const addLog = useCallback(
     (
@@ -114,6 +156,98 @@ export default function Home() {
       tileProvider: OSM_TILE_URL,
     });
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const socket = new WebSocket(backendWsUrl());
+
+    setProcessConnection("connecting");
+
+    fetch(`${BACKEND_HTTP_BASE_URL}/process/status`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Backend status failed with ${response.status}.`);
+        }
+        return response.json() as Promise<{ running: boolean; pid?: number }>;
+      })
+      .then((status) => {
+        if (!isActive) {
+          return;
+        }
+
+        setProcessStatus(status.running ? "running" : "stopped");
+        setProcessPid(status.pid ?? null);
+        setProcessError(null);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : "Backend status unavailable.";
+        setProcessStatus("error");
+        setProcessError(message);
+        addLog("warn", message);
+      });
+
+    socket.addEventListener("open", () => {
+      if (!isActive) {
+        return;
+      }
+
+      setProcessConnection("connected");
+      setProcessError(null);
+    });
+
+    socket.addEventListener("message", (event) => {
+      if (!isActive) {
+        return;
+      }
+
+      const message = JSON.parse(event.data) as ProcessSocketMessage;
+
+      if (message.type === "status") {
+        setProcessStatus(message.status);
+        setProcessPid(message.pid ?? null);
+        setProcessExitCode(
+          message.status === "stopped" ? message.exit_code ?? null : null,
+        );
+        return;
+      }
+
+      setProcessLogs((current) => [
+        {
+          id: Date.now() + Math.random(),
+          level: message.level,
+          message: message.message,
+        },
+        ...current.slice(0, 99),
+      ]);
+    });
+
+    socket.addEventListener("close", () => {
+      if (!isActive) {
+        return;
+      }
+
+      setProcessConnection("disconnected");
+    });
+
+    socket.addEventListener("error", () => {
+      if (!isActive) {
+        return;
+      }
+
+      setProcessConnection("disconnected");
+      setProcessError("Process WebSocket is not connected.");
+    });
+
+    return () => {
+      isActive = false;
+      socket.close();
+    };
+  }, [addLog]);
 
   const mapTiles = useMemo(
     () => buildMapTiles(mapCenter, zoom, MAP_SIZE),
@@ -433,6 +567,50 @@ export default function Home() {
     }
   };
 
+  const startDemoProcess = async () => {
+    try {
+      const response = await fetch(`${BACKEND_HTTP_BASE_URL}/process/start`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Start failed with ${response.status}.`);
+      }
+
+      const result = (await response.json()) as { status: string };
+      setProcessError(null);
+      addLog("info", `Demo process ${result.status}.`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Demo process start failed.";
+      setProcessStatus("error");
+      setProcessError(message);
+      addLog("error", message);
+    }
+  };
+
+  const stopDemoProcess = async () => {
+    try {
+      const response = await fetch(`${BACKEND_HTTP_BASE_URL}/process/stop`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Stop failed with ${response.status}.`);
+      }
+
+      const result = (await response.json()) as { status: string };
+      setProcessError(null);
+      addLog("info", `Demo process ${result.status}.`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Demo process stop failed.";
+      setProcessStatus("error");
+      setProcessError(message);
+      addLog("error", message);
+    }
+  };
+
   const changeZoom = (
     nextZoom: number,
     anchor = { x: MAP_SIZE.x / 2, y: MAP_SIZE.y / 2 },
@@ -654,8 +832,16 @@ export default function Home() {
         <DebugPanel
           logs={logs}
           obstacleBoxes={obstacleBoxes}
+          processConnection={processConnection}
+          processError={processError}
+          processExitCode={processExitCode}
+          processLogs={processLogs}
+          processPid={processPid}
+          processStatus={processStatus}
           rosPayloadJson={rosPayloadJson}
           onCopyRosPayload={copyRosPayload}
+          onStartProcess={startDemoProcess}
+          onStopProcess={stopDemoProcess}
           onRemoveObstacle={removeObstacle}
         />
       </section>

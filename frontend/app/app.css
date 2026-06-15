@@ -814,6 +814,139 @@ button {
   font-size: 0.84rem;
 }
 
+.process-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.process-pill {
+  display: inline-grid;
+  min-width: 74px;
+  min-height: 26px;
+  place-items: center;
+  border: 1px solid #b8c5bc;
+  border-radius: 999px;
+  background: #f6f8f5;
+  color: #536158;
+  font-size: 0.72rem;
+  font-weight: 820;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.process-pill.running {
+  border-color: #1f6f59;
+  background: #e4f4ee;
+  color: #17624e;
+}
+
+.process-pill.stopping {
+  border-color: #deb24e;
+  background: #fff7de;
+  color: #755407;
+}
+
+.process-pill.error {
+  border-color: #dfa29a;
+  background: #fff1ef;
+  color: #9f2d24;
+}
+
+.process-state-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.process-state-grid div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d1dbd5;
+  border-radius: 8px;
+  background: #f6f8f5;
+}
+
+.process-state-grid dt {
+  margin: 0 0 4px;
+  color: #68756d;
+  font-size: 0.68rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.process-state-grid dd {
+  overflow: hidden;
+  margin: 0;
+  color: #17211d;
+  font-size: 0.84rem;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-error {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border: 1px solid #dfa29a;
+  border-radius: 8px;
+  background: #fff1ef;
+  color: #9f2d24;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.process-log {
+  display: grid;
+  gap: 0;
+  overflow: auto;
+  max-height: 220px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 1px solid #cfd9d3;
+  border-radius: 8px;
+  background: #101715;
+  list-style: none;
+}
+
+.process-log li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(215, 241, 231, 0.1);
+  color: #d7f1e7;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.process-log li:first-child {
+  border-top: 0;
+}
+
+.process-log span {
+  color: #8fb7a7;
+  font-weight: 820;
+}
+
+.process-log code {
+  overflow-wrap: anywhere;
+  color: #d7f1e7;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.process-log .stderr code,
+.process-log .stderr span {
+  color: #ffb2a8;
+}
+
+.process-log .empty-log {
+  display: block;
+  color: #8fb7a7;
+}
+
 .export-heading {
   display: flex;
   align-items: center;
