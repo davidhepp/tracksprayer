@@ -11,15 +11,16 @@ import {
   MAP_SIZE,
   MAX_OSM_TILE_ZOOM,
   OSM_TILE_URL,
-  SKIDPAD,
   TILE_SIZE,
-  type Cone,
   type ConeWaypoint,
   type MapRect,
   type MapTile,
   type ObstacleBox,
   type TrackPlacement,
 } from "./missionTypes";
+import { loadSkidpadCones } from "./skidpadCones";
+
+const SKIDPAD_CONES = loadSkidpadCones();
 
 export function buildConeWaypoints(
   track: TrackPlacement,
@@ -31,60 +32,22 @@ export function buildConeWaypoints(
       x: cone.point.x * trackScale,
       y: cone.point.y * trackScale,
     };
-    const rotatedPoint = rotatePoint(scaledPoint, { x: 0, y: 0 }, track.rotation);
+    const rotatedPoint = rotatePoint(scaledPoint, { x: 0, y: 0 }, -track.rotation);
 
     return {
       id: cone.id,
       color: cone.color,
       coordinate: offsetGpsByMeters(
         track.center,
-        { x: rotatedPoint.x, y: -rotatedPoint.y },
+        { x: rotatedPoint.x, y: rotatedPoint.y },
         zoom,
       ),
     };
   });
 }
 
-export function buildConePositionsMeters(): Cone[] {
-  const conePoints: Cone[] = [];
-  const coneRadius = SKIDPAD.outerDiameterMeters / 2;
-  const innerConeRadius = SKIDPAD.innerDiameterMeters / 2;
-  const coneAngles = [-90, -60, -30, 0, 30, 60, 90, 120, 150, 180, 210, 240];
-
-  for (const angle of coneAngles) {
-    const radians = (angle * Math.PI) / 180;
-    conePoints.push({
-      id: `left-outer-${angle}`,
-      color: "blue",
-      point: {
-        x: -12.5 + Math.cos(radians) * coneRadius,
-        y: Math.sin(radians) * coneRadius,
-      },
-    });
-    conePoints.push({
-      id: `right-inner-${angle}`,
-      color: "yellow",
-      point: {
-        x: 12.5 + Math.cos(radians) * innerConeRadius,
-        y: Math.sin(radians) * innerConeRadius,
-      },
-    });
-  }
-
-  for (const y of [-25, -18, 18, 25]) {
-    conePoints.push({
-      id: `start-left-${y}`,
-      color: "orange",
-      point: { x: -1.6, y },
-    });
-    conePoints.push({
-      id: `start-right-${y}`,
-      color: "orange",
-      point: { x: 1.6, y },
-    });
-  }
-
-  return conePoints;
+export function buildConePositionsMeters() {
+  return SKIDPAD_CONES;
 }
 
 export function pointsToRect(startPoint: Point, endPoint: Point): MapRect {

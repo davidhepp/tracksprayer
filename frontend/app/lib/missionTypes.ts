@@ -18,11 +18,15 @@ export const MAX_TRACK_SCALE = 1;
 export const MIN_OBSTACLE_SIZE_PX = 8;
 
 export const SKIDPAD = {
-  outerDiameterMeters: 25,
-  innerDiameterMeters: 15,
-  centerDistanceMeters: 25,
-  boundsWidthMeters: 56,
-  boundsHeightMeters: 62,
+  outerRadiusMeters: 10.775,
+  innerRadiusMeters: 7.475,
+  trackWidthMeters: 3.3,
+  circleCenterOffsetYMeters: 9.125,
+  outerDiameterMeters: 21.55,
+  innerDiameterMeters: 14.95,
+  centerDistanceMeters: 18.25,
+  boundsWidthMeters: 46,
+  boundsHeightMeters: 44,
 };
 
 export type TrackPlacement = {
@@ -60,10 +64,14 @@ export type DevicePosition = {
   acquiredAt: string;
 };
 
+export type ConeType = "blue" | "yellow" | "orange" | "orange_big";
+
 export type Cone = {
   id: string;
+  name: string;
+  type: ConeType;
   point: Point;
-  color: "blue" | "yellow" | "orange";
+  color: ConeType;
 };
 
 export type ConeWaypoint = {

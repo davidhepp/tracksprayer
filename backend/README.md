@@ -1,8 +1,18 @@
 # TrackSprayer Backend
 
-FastAPI service for starting, stopping, monitoring, and streaming logs from robot-related processes.
+FastAPI service for the frontend-controlled robot workflow:
 
-The current implementation runs `scripts/demo_process.sh`. The process command is centralized in `process_manager.py`, so replacing it later with deployment scripts such as `/deploy/scripts/start_localization.sh` or `/deploy/scripts/start_navigation.sh` should only require changing the configured process path and, if needed, adding process selection logic.
+1. Start localization.
+2. Wait for robot READY through rosbridge.
+3. Save waypoint and obstacle JSON files.
+4. Start navigation.
+
+The default scripts are mocks:
+
+- `scripts/mock_start_localization.sh`
+- `scripts/mock_start_navigation.sh`
+
+Replace paths through environment variables when deploying to the Raspberry Pi.
 
 ## Creating the virtual environment
 
@@ -12,81 +22,47 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+The root `./run-dev-stack.sh` script does this automatically.
+
 ## Running manually
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## API examples
-
-Start the process:
+## API
 
 ```text
-POST http://<raspberry-pi-ip>:8000/process/start
+POST /process/localization/start
+POST /process/navigation/start
+POST /process/{localization|navigation}/stop
+GET  /process/status
+POST /robot/ready
+POST /mission/files
+WS   /ws/process
 ```
 
-Stop the process:
+`/robot/ready` uses mock mode unless `TRACKSPRAYER_ROSBRIDGE_URL` is set. In
+real mode it subscribes to `TRACKSPRAYER_READY_TOPIC` and waits for the robot to
+publish `std_msgs/Bool(data=true)`.
 
-```text
-POST http://<raspberry-pi-ip>:8000/process/stop
+## Real robot configuration
+
+```bash
+export TRACKSPRAYER_LOCALIZATION_SCRIPT=/deploy/scripts/start_localization.sh
+export TRACKSPRAYER_NAVIGATION_SCRIPT=/deploy/scripts/start_navigation.sh
+export TRACKSPRAYER_LOCALIZATION_CWD=/home/ubuntu/trackSprayRobot/robot
+export TRACKSPRAYER_NAVIGATION_CWD=/home/ubuntu/trackSprayRobot/robot
+export TRACKSPRAYER_WAYPOINTS_FILE=/home/ubuntu/tracksprayer/waypoints.json
+export TRACKSPRAYER_OBSTACLES_FILE=/home/ubuntu/tracksprayer/obstacles.json
+export TRACKSPRAYER_ROSBRIDGE_URL=ws://<ROBOT_IP>:9090
+export TRACKSPRAYER_READY_TOPIC=/robot_ready
+export TRACKSPRAYER_READY_TYPE=std_msgs/Bool
+export TRACKSPRAYER_READY_TIMEOUT_SECONDS=10
 ```
 
-Get current status:
+Adjust the JSON paths to the exact files read by the navigation nodes in the ROS
+repository. The backend writes those files before starting navigation.
 
-```text
-GET http://<raspberry-pi-ip>:8000/process/status
-```
-
-Connect to process events:
-
-```text
-WS ws://<raspberry-pi-ip>:8000/ws/process
-```
-
-## Example frontend snippets
-
-Start a process:
-
-```ts
-async function startProcess() {
-  const response = await fetch("http://<raspberry-pi-ip>:8000/process/start", {
-    method: "POST",
-  });
-  return response.json();
-}
-```
-
-Stop a process:
-
-```ts
-async function stopProcess() {
-  const response = await fetch("http://<raspberry-pi-ip>:8000/process/stop", {
-    method: "POST",
-  });
-  return response.json();
-}
-```
-
-Open a WebSocket and receive logs:
-
-```ts
-const socket = new WebSocket("ws://<raspberry-pi-ip>:8000/ws/process");
-
-socket.addEventListener("message", (event) => {
-  const message = JSON.parse(event.data);
-
-  if (message.type === "status") {
-    console.log("process status:", message.status, message);
-  }
-
-  if (message.type === "log") {
-    console.log(`[${message.level}] ${message.message}`);
-  }
-});
-
-socket.addEventListener("close", () => {
-  console.log("process WebSocket closed");
-});
-```
-
+Rosbridge must be running on the robot, typically through `rosbridge_suite` on
+port `9090`.

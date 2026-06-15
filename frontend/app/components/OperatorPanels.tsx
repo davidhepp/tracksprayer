@@ -18,6 +18,7 @@ import { formatAccuracy } from "../lib/trackGeometry";
 type MissionControlsProps = {
   mapCenter: GpsCoordinate;
   devicePosition: DevicePosition | null;
+  disabled: boolean;
   searchQuery: string;
   searchResults: LocationSearchResult[];
   searchError: string | null;
@@ -43,24 +44,37 @@ type MissionControlsProps = {
 
 type DebugPanelProps = {
   logs: LogEntry[];
+  missionFilesPath: string | null;
+  missionFilesSaved: boolean;
+  navigationReady: boolean;
+  navigationRunning: boolean;
   obstacleBoxes: ObstacleBox[];
   processConnection: "connecting" | "connected" | "disconnected";
   processError: string | null;
-  processExitCode: number | null;
+  processExitCodes: Record<ProcessName, number | null>;
   processLogs: ProcessLogLine[];
-  processPid: number | null;
-  processStatus: ProcessStatus;
+  processPids: Record<ProcessName, number | null>;
+  processStatuses: Record<ProcessName, ProcessStatus>;
+  robotReady: boolean;
   rosPayloadJson: string;
+  sprayCheckAccepted: boolean;
   onRemoveObstacle: (id: string) => void;
   onCopyRosPayload: () => void;
-  onStartProcess: () => void;
-  onStopProcess: () => void;
+  onSaveMissionFiles: () => void;
+  onSendRobotReady: () => void;
+  onSprayCheckChange: (accepted: boolean) => void;
+  onStartLocalization: () => void;
+  onStartNavigation: () => void;
+  onStopLocalization: () => void;
+  onStopNavigation: () => void;
 };
 
 type ProcessStatus = "unknown" | "running" | "stopping" | "stopped" | "error";
+type ProcessName = "localization" | "navigation";
 
 type ProcessLogLine = {
   id: number;
+  process: ProcessName;
   level: "stdout" | "stderr";
   message: string;
 };
@@ -68,6 +82,7 @@ type ProcessLogLine = {
 export function MissionControls({
   mapCenter,
   devicePosition,
+  disabled,
   searchQuery,
   searchResults,
   searchError,
@@ -91,7 +106,11 @@ export function MissionControls({
   onClearObstacles,
 }: MissionControlsProps) {
   return (
-    <aside className="control-panel" aria-label="Mission controls">
+    <aside
+      className={`control-panel ${disabled ? "is-locked" : ""}`}
+      aria-disabled={disabled}
+      aria-label="Mission controls"
+    >
       <LocationPanel
         devicePosition={devicePosition}
         isSearching={isSearching}
@@ -135,40 +154,52 @@ export function MissionControls({
 
 export function DebugPanel({
   logs,
+  missionFilesPath,
+  missionFilesSaved,
+  navigationReady,
+  navigationRunning,
   obstacleBoxes,
   processConnection,
   processError,
-  processExitCode,
+  processExitCodes,
   processLogs,
-  processPid,
-  processStatus,
+  processPids,
+  processStatuses,
+  robotReady,
   rosPayloadJson,
+  sprayCheckAccepted,
   onRemoveObstacle,
   onCopyRosPayload,
-  onStartProcess,
-  onStopProcess,
+  onSaveMissionFiles,
+  onSendRobotReady,
+  onSprayCheckChange,
+  onStartLocalization,
+  onStartNavigation,
+  onStopLocalization,
+  onStopNavigation,
 }: DebugPanelProps) {
   return (
     <aside className="control-panel right-panel" aria-label="Available data and logs">
-      <section className="panel-section">
-        <div className="section-heading">
-          <p className="eyebrow">Robot state</p>
-          <h2>ROS data</h2>
-        </div>
-        <UnavailableData label="Battery" />
-        <UnavailableData label="Spray can" />
-        <UnavailableData label="ROS bridge" />
-      </section>
-
-      <ProcessDemoPanel
+      <RobotWorkflowPanel
         connection={processConnection}
         error={processError}
-        exitCode={processExitCode}
+        exitCodes={processExitCodes}
         logs={processLogs}
-        pid={processPid}
-        status={processStatus}
-        onStart={onStartProcess}
-        onStop={onStopProcess}
+        missionFilesPath={missionFilesPath}
+        missionFilesSaved={missionFilesSaved}
+        navigationReady={navigationReady}
+        navigationRunning={navigationRunning}
+        pids={processPids}
+        robotReady={robotReady}
+        sprayCheckAccepted={sprayCheckAccepted}
+        statuses={processStatuses}
+        onSaveMissionFiles={onSaveMissionFiles}
+        onSendRobotReady={onSendRobotReady}
+        onSprayCheckChange={onSprayCheckChange}
+        onStartLocalization={onStartLocalization}
+        onStartNavigation={onStartNavigation}
+        onStopLocalization={onStopLocalization}
+        onStopNavigation={onStopNavigation}
       />
 
       <section className="panel-section">
@@ -214,35 +245,61 @@ export function DebugPanel({
   );
 }
 
-function ProcessDemoPanel({
+function RobotWorkflowPanel({
   connection,
   error,
-  exitCode,
+  exitCodes,
   logs,
-  pid,
-  status,
-  onStart,
-  onStop,
+  missionFilesPath,
+  missionFilesSaved,
+  navigationReady,
+  navigationRunning,
+  pids,
+  robotReady,
+  sprayCheckAccepted,
+  statuses,
+  onSaveMissionFiles,
+  onSendRobotReady,
+  onSprayCheckChange,
+  onStartLocalization,
+  onStartNavigation,
+  onStopLocalization,
+  onStopNavigation,
 }: {
   connection: "connecting" | "connected" | "disconnected";
   error: string | null;
-  exitCode: number | null;
+  exitCodes: Record<ProcessName, number | null>;
   logs: ProcessLogLine[];
-  pid: number | null;
-  status: ProcessStatus;
-  onStart: () => void;
-  onStop: () => void;
+  missionFilesPath: string | null;
+  missionFilesSaved: boolean;
+  navigationReady: boolean;
+  navigationRunning: boolean;
+  pids: Record<ProcessName, number | null>;
+  robotReady: boolean;
+  sprayCheckAccepted: boolean;
+  statuses: Record<ProcessName, ProcessStatus>;
+  onSaveMissionFiles: () => void;
+  onSendRobotReady: () => void;
+  onSprayCheckChange: (accepted: boolean) => void;
+  onStartLocalization: () => void;
+  onStartNavigation: () => void;
+  onStopLocalization: () => void;
+  onStopNavigation: () => void;
 }) {
-  const isRunning = status === "running" || status === "stopping";
+  const localizationRunning =
+    statuses.localization === "running" || statuses.localization === "stopping";
+  const localizationStarted = statuses.localization === "running";
 
   return (
     <section className="panel-section">
       <div className="section-heading process-heading">
         <div>
-          <p className="eyebrow">Backend demo</p>
-          <h2>Process monitor</h2>
+          <p className="eyebrow">Robot workflow</p>
+          <h2>Localization to navigation</h2>
         </div>
-        <span className={`process-pill ${status}`}>{status}</span>
+        <span className={`process-pill ${statuses.localization}`}>
+          {statuses.localization}
+        </span>
       </div>
 
       <dl className="process-state-grid">
@@ -251,33 +308,83 @@ function ProcessDemoPanel({
           <dd>{connection}</dd>
         </div>
         <div>
-          <dt>PID</dt>
-          <dd>{pid ?? "none"}</dd>
+          <dt>Localization</dt>
+          <dd>{pids.localization ?? statuses.localization}</dd>
         </div>
         <div>
-          <dt>Exit</dt>
-          <dd>{exitCode ?? "none"}</dd>
+          <dt>Navigation</dt>
+          <dd>{pids.navigation ?? statuses.navigation}</dd>
         </div>
       </dl>
 
-      <div className="button-row compact-buttons">
-        <button
-          type="button"
-          className="primary-button"
-          disabled={isRunning}
-          onClick={onStart}
-        >
-          Start demo
-        </button>
-        <button
-          type="button"
-          className="secondary-button"
-          disabled={!isRunning}
-          onClick={onStop}
-        >
-          Stop
-        </button>
-      </div>
+      <ol className="workflow-steps">
+        <li>
+          <div>
+            <strong>1. Start localization</strong>
+            <span>Runs the mocked Phase 1 script now, real Pi script later.</span>
+          </div>
+          <button
+            type="button"
+            className="primary-button small-button"
+            disabled={localizationRunning}
+            onClick={onStartLocalization}
+          >
+            Start
+          </button>
+        </li>
+        <li>
+          <div>
+            <strong>2. Confirm READY</strong>
+            <span>Waits for the robot READY message over rosbridge.</span>
+          </div>
+          <button
+            type="button"
+            className="secondary-button small-button"
+            disabled={!localizationStarted || robotReady}
+            onClick={onSendRobotReady}
+          >
+            READY
+          </button>
+        </li>
+        <li>
+          <label className="workflow-check">
+            <input
+              checked={sprayCheckAccepted}
+              type="checkbox"
+              onChange={(event) => onSprayCheckChange(event.target.checked)}
+            />
+            <span>Spray can checked or drive anyway</span>
+          </label>
+          <button
+            type="button"
+            className="secondary-button small-button"
+            disabled={!robotReady || !sprayCheckAccepted}
+            onClick={onSaveMissionFiles}
+          >
+            Save JSON
+          </button>
+        </li>
+        <li>
+          <div>
+            <strong>4. Align and start navigation</strong>
+            <span>After manual alignment, starts mocked Phase 2.</span>
+          </div>
+          <button
+            type="button"
+            className="primary-button small-button"
+            disabled={!navigationReady || navigationRunning}
+            onClick={onStartNavigation}
+          >
+            Navigate
+          </button>
+        </li>
+      </ol>
+
+      {missionFilesSaved && (
+        <p className="helper-text">
+          Mission JSON saved{missionFilesPath ? `: ${missionFilesPath}` : "."}
+        </p>
+      )}
 
       {error && (
         <p className="process-error" role="status">
@@ -285,13 +392,47 @@ function ProcessDemoPanel({
         </p>
       )}
 
+      <div className="button-row compact-buttons">
+        <button
+          type="button"
+          className="secondary-button small-button"
+          disabled={!localizationRunning}
+          onClick={onStopLocalization}
+        >
+          Stop loc
+        </button>
+        <button
+          type="button"
+          className="secondary-button small-button"
+          disabled={!navigationRunning}
+          onClick={onStopNavigation}
+        >
+          Stop nav
+        </button>
+      </div>
+
+      <dl className="process-state-grid">
+        <div>
+          <dt>Loc exit</dt>
+          <dd>{exitCodes.localization ?? "none"}</dd>
+        </div>
+        <div>
+          <dt>Nav exit</dt>
+          <dd>{exitCodes.navigation ?? "none"}</dd>
+        </div>
+        <div>
+          <dt>Files</dt>
+          <dd>{missionFilesSaved ? "saved" : "pending"}</dd>
+        </div>
+      </dl>
+
       <ol className="process-log" aria-label="Demo process log output">
         {logs.length === 0 ? (
           <li className="empty-log">No process output yet.</li>
         ) : (
           logs.map((line) => (
             <li key={line.id} className={line.level}>
-              <span>{line.level}</span>
+              <span>{line.process}</span>
               <code>{line.message}</code>
             </li>
           ))
@@ -531,15 +672,6 @@ function CoordinateCard({
         {coordinate.lat.toFixed(6)}, {coordinate.lng.toFixed(6)}
       </strong>
       <small>{detail}</small>
-    </div>
-  );
-}
-
-function UnavailableData({ label }: { label: string }) {
-  return (
-    <div className="unavailable-row">
-      <span>{label}</span>
-      <strong>Not connected</strong>
     </div>
   );
 }

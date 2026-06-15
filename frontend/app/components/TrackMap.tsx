@@ -1,4 +1,4 @@
-import type { PointerEvent, RefObject } from "react";
+import { useState, type PointerEvent, type RefObject } from "react";
 
 import type { GpsCoordinate, Point } from "../lib/mapMath";
 import { gpsToMapPoint } from "../lib/mapMath";
@@ -17,8 +17,17 @@ import {
   type VisibleObstacleBox,
 } from "../lib/missionTypes";
 import { buildConePositionsMeters, formatZoom } from "../lib/trackGeometry";
+import {
+  EXPECTED_TOTAL_CONES,
+  SKIDPAD_GUIDES,
+  SKIDPAD_OVERLAY_TRANSFORM,
+  worldToScreen,
+  type SkidpadCone,
+  type SkidpadOverlayTransform,
+} from "../lib/skidpadCones";
 
 type TrackMapProps = {
+  disabled: boolean;
   mapRef: RefObject<HTMLDivElement | null>;
   mapTiles: MapTile[];
   dragState: DragState | null;
@@ -41,6 +50,7 @@ type TrackMapProps = {
 };
 
 export function TrackMap({
+  disabled,
   mapRef,
   mapTiles,
   dragState,
@@ -61,8 +71,15 @@ export function TrackMap({
   onRotatePointerDown,
   onZoomChange,
 }: TrackMapProps) {
+  const [showSkidpadDebug, setShowSkidpadDebug] = useState(false);
+  const [showSkidpadLabels, setShowSkidpadLabels] = useState(false);
+
   return (
-    <section className="map-section" aria-label="Map and track editor">
+    <section
+      className={`map-section ${disabled ? "is-locked" : ""}`}
+      aria-disabled={disabled}
+      aria-label="Map and track editor"
+    >
       <div
         ref={mapRef}
         className={`map-viewport ${dragState?.type === "map" ? "is-panning" : ""} ${
@@ -99,6 +116,27 @@ export function TrackMap({
             -
           </button>
         </div>
+        <div
+          className="overlay-debug-controls"
+          aria-label="Skidpad overlay debug controls"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className={showSkidpadDebug ? "is-active" : ""}
+            onClick={() => setShowSkidpadDebug((current) => !current)}
+          >
+            Debug
+          </button>
+          <button
+            type="button"
+            className={showSkidpadLabels ? "is-active" : ""}
+            disabled={!showSkidpadDebug}
+            onClick={() => setShowSkidpadLabels((current) => !current)}
+          >
+            Labels
+          </button>
+        </div>
         {devicePosition && (
           <RobotMarker
             coordinate={devicePosition.coordinate}
@@ -132,7 +170,10 @@ export function TrackMap({
             onPointerDown={onRotatePointerDown}
             aria-label="Rotate skidpad overlay"
           />
-          <SkidpadOverlay />
+          <SkidpadOverlay
+            showDebug={showSkidpadDebug}
+            showLabels={showSkidpadDebug && showSkidpadLabels}
+          />
         </div>
         <a
           className="osm-attribution"
@@ -250,35 +291,99 @@ function RobotMarker({
   );
 }
 
-function SkidpadOverlay() {
+function SkidpadOverlay({
+  showDebug,
+  showLabels,
+}: {
+  showDebug: boolean;
+  showLabels: boolean;
+}) {
+  const cones = buildConePositionsMeters();
+  const viewBox = `-${SKIDPAD.boundsWidthMeters / 2} -${SKIDPAD.boundsHeightMeters / 2} ${SKIDPAD.boundsWidthMeters} ${SKIDPAD.boundsHeightMeters}`;
+
   return (
     <svg
-      viewBox={`-${SKIDPAD.boundsWidthMeters / 2} -${SKIDPAD.boundsHeightMeters / 2} ${SKIDPAD.boundsWidthMeters} ${SKIDPAD.boundsHeightMeters}`}
+      viewBox={viewBox}
       aria-hidden="true"
+      data-cone-count={cones.length}
+      data-expected-cone-count={EXPECTED_TOTAL_CONES}
     >
-      <rect
-        x={-SKIDPAD.boundsWidthMeters / 2}
-        y={-SKIDPAD.boundsHeightMeters / 2}
-        width={SKIDPAD.boundsWidthMeters}
-        height={SKIDPAD.boundsHeightMeters}
-        rx="1.6"
-      />
-      <circle cx={-12.5} cy="0" r={SKIDPAD.outerDiameterMeters / 2} />
-      <circle cx={12.5} cy="0" r={SKIDPAD.outerDiameterMeters / 2} />
-      <circle className="inner-limit" cx={-12.5} cy="0" r={SKIDPAD.innerDiameterMeters / 2} />
-      <circle className="inner-limit" cx={12.5} cy="0" r={SKIDPAD.innerDiameterMeters / 2} />
-      <path className="start-lane" d="M-1 -30 V-13 M1 -30 V-13 M-1 13 V30 M1 13 V30" />
-      {buildConePositionsMeters().map((cone) => (
-        <g key={cone.id} className={`cone ${cone.color}`}>
-          <circle cx={cone.point.x} cy={cone.point.y} r="0.42" />
-          <path
-            d={`M${cone.point.x - 0.45} ${cone.point.y + 0.65} L${cone.point.x} ${
-              cone.point.y - 0.65
-            } L${cone.point.x + 0.45} ${cone.point.y + 0.65} Z`}
-          />
-        </g>
-      ))}
+      {showDebug && <SkidpadDebugGuides transform={SKIDPAD_OVERLAY_TRANSFORM} />}
+      {cones.map((cone) =>
+        renderCone(cone, SKIDPAD_OVERLAY_TRANSFORM, showLabels),
+      )}
     </svg>
+  );
+}
+
+function SkidpadDebugGuides({
+  transform,
+}: {
+  transform: SkidpadOverlayTransform;
+}) {
+  const xStart = worldToScreen(-SKIDPAD.boundsWidthMeters / 2, 0, transform);
+  const xEnd = worldToScreen(SKIDPAD.boundsWidthMeters / 2, 0, transform);
+  const yStart = worldToScreen(0, -SKIDPAD.boundsHeightMeters / 2, transform);
+  const yEnd = worldToScreen(0, SKIDPAD.boundsHeightMeters / 2, transform);
+
+  return (
+    <g className="skidpad-debug">
+      <line x1={xStart.x} y1={xStart.y} x2={xEnd.x} y2={xEnd.y} />
+      <line x1={yStart.x} y1={yStart.y} x2={yEnd.x} y2={yEnd.y} />
+      {SKIDPAD_GUIDES.circleCenters.map((center) => {
+        const point = worldToScreen(center.x, center.y, transform);
+        return (
+          <g key={`${center.x}-${center.y}`} className="skidpad-guide-center">
+            <circle
+              className="outer-guide"
+              cx={point.x}
+              cy={point.y}
+              r={SKIDPAD_GUIDES.outerRadiusMeters * transform.metersToPixels}
+            />
+            <circle
+              className="inner-guide"
+              cx={point.x}
+              cy={point.y}
+              r={SKIDPAD_GUIDES.innerRadiusMeters * transform.metersToPixels}
+            />
+            <path d={`M${point.x - 0.35} ${point.y}H${point.x + 0.35}`} />
+            <path d={`M${point.x} ${point.y - 0.35}V${point.y + 0.35}`} />
+            <text x={point.x + 0.5} y={point.y - 0.5}>
+              ({center.x.toFixed(3)}, {center.y.toFixed(3)})
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+function renderCone(
+  cone: SkidpadCone,
+  transform: SkidpadOverlayTransform,
+  showLabel: boolean,
+) {
+  const point = worldToScreen(cone.point.x, cone.point.y, transform);
+  const size = cone.type === "orange_big" ? 0.95 : 0.62;
+  const base = size * 0.72;
+
+  return (
+    <g
+      key={cone.id}
+      className={`cone ${cone.type}`}
+      data-cone-type={cone.type}
+      data-world-x={cone.point.x}
+      data-world-y={cone.point.y}
+      transform={`translate(${point.x} ${point.y})`}
+    >
+      <circle r={size * 0.52} />
+      <path d={`M${-base} ${base} L0 ${-size} L${base} ${base} Z`} />
+      {showLabel && (
+        <text x={size + 0.18} y={-size - 0.16}>
+          {cone.type} ({cone.point.x.toFixed(2)}, {cone.point.y.toFixed(2)})
+        </text>
+      )}
+    </g>
   );
 }
 
