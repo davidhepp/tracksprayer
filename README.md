@@ -12,4 +12,4 @@ The script creates `backend/.venv` if needed, installs `backend/requirements.txt
 starts the FastAPI backend on port `8000`, starts the frontend dev server, and
 stops both services when either one exits.
 
-Robot deployment details are documented in [integration.md](integration.md).
+Raspberry Pi robot setup is documented in [PI_SETUP.md](PI_SETUP.md).
