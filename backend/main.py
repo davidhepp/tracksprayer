@@ -11,7 +11,10 @@ from pydantic import BaseModel
 
 from process_manager import process_manager
 from settings import (
+    CORS_ORIGINS,
     OBSTACLES_FILE,
+    ROSBRIDGE_READY_CODE,
+    ROSBRIDGE_READY_SOURCE,
     ROSBRIDGE_READY_TOPIC,
     ROSBRIDGE_READY_TIMEOUT_SECONDS,
     ROSBRIDGE_READY_TYPE,
@@ -22,13 +25,9 @@ from settings import (
 
 app = FastAPI(title="TrackSprayer Process Backend")
 
-# TODO: Configure production frontend origins from deployment-specific settings.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +48,11 @@ async def _start_process(name: str) -> dict[str, bool | str]:
         status = await process_manager.start(name)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Process script is not executable: {exc.filename}",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -90,14 +94,8 @@ async def save_mission_files(payload: MissionFilesRequest) -> dict[str, bool | s
     WAYPOINTS_FILE.parent.mkdir(parents=True, exist_ok=True)
     OBSTACLES_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    WAYPOINTS_FILE.write_text(
-        json.dumps(payload.waypoints, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    OBSTACLES_FILE.write_text(
-        json.dumps(payload.obstacles, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    _write_json_atomic(WAYPOINTS_FILE, payload.waypoints)
+    _write_json_atomic(OBSTACLES_FILE, payload.obstacles)
 
     return {
         "ok": True,
@@ -161,6 +159,7 @@ async def wait_for_robot_ready() -> dict[str, bool | str]:
         "status": "ready_received",
         "source": "robot",
         "topic": ROSBRIDGE_READY_TOPIC,
+        "code": ROSBRIDGE_READY_CODE,
     }
 
 
@@ -192,7 +191,22 @@ def _is_robot_ready_message(message: Any) -> bool:
         return False
 
     msg = message.get("msg")
-    return isinstance(msg, dict) and msg.get("data") is True
+    if not isinstance(msg, dict):
+        return False
+
+    if msg.get("data") is True:
+        return True
+
+    if ROSBRIDGE_READY_SOURCE and msg.get("source") != ROSBRIDGE_READY_SOURCE:
+        return False
+
+    return msg.get("code") == ROSBRIDGE_READY_CODE
+
+
+def _write_json_atomic(path: Path, data: Any) -> None:
+    temp_path = path.with_name(f".{path.name}.tmp")
+    temp_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    temp_path.replace(path)
 
 
 def _reveal_path(path: Path) -> None:

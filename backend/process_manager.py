@@ -58,6 +58,10 @@ class ProcessManager:
                 raise FileNotFoundError(
                     f"Process script not found: {definition.script_path}"
                 )
+            if not definition.working_directory.exists():
+                raise FileNotFoundError(
+                    f"Process working directory not found: {definition.working_directory}"
+                )
 
             process = await asyncio.create_subprocess_exec(
                 str(definition.script_path),
@@ -70,6 +74,7 @@ class ProcessManager:
                     "TRACKSPRAYER_SHARED_DIR": str(SHARED_FILES_DIR),
                     "TRACKSPRAYER_WAYPOINTS_FILE": str(WAYPOINTS_FILE),
                     "TRACKSPRAYER_OBSTACLES_FILE": str(OBSTACLES_FILE),
+                    "PYTHONUNBUFFERED": "1",
                 },
                 preexec_fn=os.setsid,
             )
