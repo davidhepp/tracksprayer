@@ -15,6 +15,7 @@ from .generator import (
 )
 from .schema import (
     GENERATED_DISCIPLINES,
+    PRESET_ONLY_DISCIPLINES,
     GenerateRequest,
     SaveTrackRequest,
     Track,
@@ -26,6 +27,8 @@ from .storage import PresetProtectedError, TrackStorageError, slugify, track_sto
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
 DISCIPLINE_LABELS = {
+    "skidpad": "Skidpad",
+    "acceleration": "Acceleration",
     "ebs_test": "EBS Test",
     "trackdrive": "Trackdrive",
     "autocross": "Autocross",
@@ -53,6 +56,15 @@ def get_track(track_id: str) -> Track:
 def generate_track(request: GenerateRequest) -> Track:
     discipline = request.discipline
     params: dict = {"seed": request.seed}
+
+    if discipline in PRESET_ONLY_DISCIPLINES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"'{DISCIPLINE_LABELS.get(discipline, discipline)}' is a fixed "
+                "standard preset and cannot be generated."
+            ),
+        )
 
     if discipline == "ebs_test":
         geometry = build_ebs_test()

@@ -2,6 +2,8 @@ export const BACKEND_HTTP_BASE_URL =
   import.meta.env.VITE_ROBOT_BACKEND_URL ?? "http://localhost:8000";
 
 export type Discipline =
+  | "skidpad"
+  | "acceleration"
   | "ebs_test"
   | "trackdrive"
   | "autocross";
@@ -50,6 +52,8 @@ export type GenerateRequest = {
 };
 
 export const DISCIPLINE_LABELS: Record<Discipline, string> = {
+  skidpad: "Skidpad",
+  acceleration: "Acceleration",
   ebs_test: "EBS Test",
   trackdrive: "Trackdrive",
   autocross: "Autocross",
