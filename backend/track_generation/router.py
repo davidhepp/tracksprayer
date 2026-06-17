@@ -10,9 +10,7 @@ from fastapi.responses import Response
 from .export import export_track
 from .generator import (
     TrackGenerationError,
-    build_acceleration,
     build_ebs_test,
-    build_skidpad,
     generate_voronoi_track,
 )
 from .schema import (
@@ -28,8 +26,6 @@ from .storage import PresetProtectedError, TrackStorageError, slugify, track_sto
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
 DISCIPLINE_LABELS = {
-    "skidpad": "Skidpad",
-    "acceleration": "Acceleration",
     "ebs_test": "EBS Test",
     "trackdrive": "Trackdrive",
     "autocross": "Autocross",
@@ -58,11 +54,7 @@ def generate_track(request: GenerateRequest) -> Track:
     discipline = request.discipline
     params: dict = {"seed": request.seed}
 
-    if discipline == "skidpad":
-        geometry = build_skidpad()
-    elif discipline == "acceleration":
-        geometry = build_acceleration()
-    elif discipline == "ebs_test":
+    if discipline == "ebs_test":
         geometry = build_ebs_test()
     elif discipline in GENERATED_DISCIPLINES:
         try:

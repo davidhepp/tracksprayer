@@ -1,7 +1,7 @@
 """Track geometry generation.
 
-Deterministic disciplines (skidpad / acceleration / ebs_test) are built from
-fixed, rule-compliant geometry. Trackdrive / autocross use a bounded-Voronoi
+The deterministic ebs_test discipline is built from fixed, rule-compliant
+geometry. Trackdrive / autocross use a bounded-Voronoi
 generator adapted from https://github.com/mvanlobensels/random-track-generator
 (MIT) with Formula Student 2025/2026 rule limits enforced:
   * minimum turn radius 4.5 m -> CURVATURE_THRESHOLD = 1/4.5
@@ -39,17 +39,6 @@ class TrackGenerationError(Exception):
 # Deterministic disciplines
 # --------------------------------------------------------------------------- #
 
-def _circle_cones(center: tuple[float, float], radius: float, angles_deg) -> list[list[float]]:
-    cx, cy = center
-    cones = []
-    for a in angles_deg:
-        rad = math.radians(a)
-        cones.append([round(cx + radius * math.cos(rad), 4), round(cy + radius * math.sin(rad), 4)])
-    return cones
-
-
-
-
 def _straight_track(length: float, width: float, spacing: float = 5.0) -> TrackGeometry:
     half_w = width / 2
     xs = list(np.arange(spacing, length, spacing))
@@ -74,7 +63,6 @@ def _straight_track(length: float, width: float, spacing: float = 5.0) -> TrackG
             [round(length, 4), round(-half_w, 4)],
         ],
     )
-
 
 
 def build_ebs_test() -> TrackGeometry:

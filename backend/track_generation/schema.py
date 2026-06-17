@@ -11,26 +11,18 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Discipline = Literal[
-    "skidpad",
-    "acceleration",
     "ebs_test",
     "trackdrive",
     "autocross",
 ]
 
 DISCIPLINES: tuple[Discipline, ...] = (
-    "skidpad",
-    "acceleration",
     "ebs_test",
     "trackdrive",
     "autocross",
 )
 
-DETERMINISTIC_DISCIPLINES: tuple[Discipline, ...] = (
-    "skidpad",
-    "acceleration",
-    "ebs_test",
-)
+DETERMINISTIC_DISCIPLINES: tuple[Discipline, ...] = ("ebs_test",)
 
 GENERATED_DISCIPLINES: tuple[Discipline, ...] = (
     "trackdrive",
@@ -38,11 +30,7 @@ GENERATED_DISCIPLINES: tuple[Discipline, ...] = (
 )
 
 # Preset ids that ship with the app and must never be deleted.
-PROTECTED_PRESET_IDS: tuple[str, ...] = (
-    "skidpad",
-    "acceleration",
-    "ebs_test",
-)
+PROTECTED_PRESET_IDS: tuple[str, ...] = ("ebs_test",)
 
 # Formula Student Driverless 2025/2026 rule limits.
 MIN_TRACK_WIDTH_M = 3.0
