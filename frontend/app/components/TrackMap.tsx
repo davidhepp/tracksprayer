@@ -6,8 +6,8 @@ import {
   MAP_SIZE,
   MAX_ZOOM,
   MIN_ZOOM,
-  SKIDPAD,
   ZOOM_STEP,
+  type Cone,
   type DevicePosition,
   type DragState,
   type EditorMode,
@@ -16,15 +16,8 @@ import {
   type TrackPlacement,
   type VisibleObstacleBox,
 } from "../lib/missionTypes";
-import { buildConePositionsMeters, formatZoom } from "../lib/trackGeometry";
-import {
-  EXPECTED_TOTAL_CONES,
-  SKIDPAD_GUIDES,
-  SKIDPAD_OVERLAY_TRANSFORM,
-  worldToScreen,
-  type SkidpadCone,
-  type SkidpadOverlayTransform,
-} from "../lib/skidpadCones";
+import { formatZoom } from "../lib/trackGeometry";
+import type { TrackDimensions } from "../lib/trackAdapter";
 
 type TrackMapProps = {
   disabled: boolean;
@@ -41,6 +34,8 @@ type TrackMapProps = {
   track: TrackPlacement;
   trackTopLeft: Point;
   trackSize: Point;
+  trackCones: Cone[];
+  trackDimensions: TrackDimensions;
   onMapPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onMapPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onMapPointerUp: () => void;
@@ -64,6 +59,8 @@ export function TrackMap({
   track,
   trackTopLeft,
   trackSize,
+  trackCones,
+  trackDimensions,
   onMapPointerDown,
   onMapPointerMove,
   onMapPointerUp,
@@ -71,8 +68,8 @@ export function TrackMap({
   onRotatePointerDown,
   onZoomChange,
 }: TrackMapProps) {
-  const [showSkidpadDebug, setShowSkidpadDebug] = useState(false);
-  const [showSkidpadLabels, setShowSkidpadLabels] = useState(false);
+  const [showTrackDebug, setShowTrackDebug] = useState(false);
+  const [showTrackLabels, setShowTrackLabels] = useState(false);
 
   return (
     <section
@@ -118,21 +115,21 @@ export function TrackMap({
         </div>
         <div
           className="overlay-debug-controls"
-          aria-label="Skidpad overlay debug controls"
+          aria-label="Track overlay debug controls"
           onPointerDown={(event) => event.stopPropagation()}
         >
           <button
             type="button"
-            className={showSkidpadDebug ? "is-active" : ""}
-            onClick={() => setShowSkidpadDebug((current) => !current)}
+            className={showTrackDebug ? "is-active" : ""}
+            onClick={() => setShowTrackDebug((current) => !current)}
           >
             Debug
           </button>
           <button
             type="button"
-            className={showSkidpadLabels ? "is-active" : ""}
-            disabled={!showSkidpadDebug}
-            onClick={() => setShowSkidpadLabels((current) => !current)}
+            className={showTrackLabels ? "is-active" : ""}
+            disabled={!showTrackDebug}
+            onClick={() => setShowTrackLabels((current) => !current)}
           >
             Labels
           </button>
@@ -162,17 +159,19 @@ export function TrackMap({
           onPointerDown={onTrackPointerDown}
           role="button"
           tabIndex={0}
-          aria-label="Draggable skidpad track overlay"
+          aria-label="Draggable track overlay"
         >
           <button
             type="button"
             className="rotation-handle"
             onPointerDown={onRotatePointerDown}
-            aria-label="Rotate skidpad overlay"
+            aria-label="Rotate track overlay"
           />
-          <SkidpadOverlay
-            showDebug={showSkidpadDebug}
-            showLabels={showSkidpadDebug && showSkidpadLabels}
+          <TrackConeOverlay
+            cones={trackCones}
+            dimensions={trackDimensions}
+            showDebug={showTrackDebug}
+            showLabels={showTrackDebug && showTrackLabels}
           />
         </div>
         <a
@@ -291,90 +290,75 @@ function RobotMarker({
   );
 }
 
-function SkidpadOverlay({
+function TrackConeOverlay({
+  cones,
+  dimensions,
   showDebug,
   showLabels,
 }: {
+  cones: Cone[];
+  dimensions: TrackDimensions;
   showDebug: boolean;
   showLabels: boolean;
 }) {
-  const cones = buildConePositionsMeters();
-  const viewBox = `-${SKIDPAD.boundsWidthMeters / 2} -${SKIDPAD.boundsHeightMeters / 2} ${SKIDPAD.boundsWidthMeters} ${SKIDPAD.boundsHeightMeters}`;
+  const width = dimensions.width > 0 ? dimensions.width : 1;
+  const height = dimensions.height > 0 ? dimensions.height : 1;
+  const viewBox = `-${width / 2} -${height / 2} ${width} ${height}`;
 
   return (
-    <svg
-      viewBox={viewBox}
-      aria-hidden="true"
-      data-cone-count={cones.length}
-      data-expected-cone-count={EXPECTED_TOTAL_CONES}
-    >
-      {showDebug && <SkidpadDebugGuides transform={SKIDPAD_OVERLAY_TRANSFORM} />}
-      {cones.map((cone) =>
-        renderCone(cone, SKIDPAD_OVERLAY_TRANSFORM, showLabels),
-      )}
+    <svg viewBox={viewBox} aria-hidden="true" data-cone-count={cones.length}>
+      {showDebug && <TrackDebugGuides width={width} height={height} />}
+      {cones.map((cone) => (
+        <TrackConeMark key={cone.id} cone={cone} showLabel={showLabels} />
+      ))}
     </svg>
   );
 }
 
-function SkidpadDebugGuides({
-  transform,
+function TrackDebugGuides({
+  width,
+  height,
 }: {
-  transform: SkidpadOverlayTransform;
+  width: number;
+  height: number;
 }) {
-  const xStart = worldToScreen(-SKIDPAD.boundsWidthMeters / 2, 0, transform);
-  const xEnd = worldToScreen(SKIDPAD.boundsWidthMeters / 2, 0, transform);
-  const yStart = worldToScreen(0, -SKIDPAD.boundsHeightMeters / 2, transform);
-  const yEnd = worldToScreen(0, SKIDPAD.boundsHeightMeters / 2, transform);
+  const halfW = width / 2;
+  const halfH = height / 2;
 
   return (
     <g className="skidpad-debug">
-      <line x1={xStart.x} y1={xStart.y} x2={xEnd.x} y2={xEnd.y} />
-      <line x1={yStart.x} y1={yStart.y} x2={yEnd.x} y2={yEnd.y} />
-      {SKIDPAD_GUIDES.circleCenters.map((center) => {
-        const point = worldToScreen(center.x, center.y, transform);
-        return (
-          <g key={`${center.x}-${center.y}`} className="skidpad-guide-center">
-            <circle
-              className="outer-guide"
-              cx={point.x}
-              cy={point.y}
-              r={SKIDPAD_GUIDES.outerRadiusMeters * transform.metersToPixels}
-            />
-            <circle
-              className="inner-guide"
-              cx={point.x}
-              cy={point.y}
-              r={SKIDPAD_GUIDES.innerRadiusMeters * transform.metersToPixels}
-            />
-            <path d={`M${point.x - 0.35} ${point.y}H${point.x + 0.35}`} />
-            <path d={`M${point.x} ${point.y - 0.35}V${point.y + 0.35}`} />
-            <text x={point.x + 0.5} y={point.y - 0.5}>
-              ({center.x.toFixed(3)}, {center.y.toFixed(3)})
-            </text>
-          </g>
-        );
-      })}
+      <line x1={-halfW} y1={0} x2={halfW} y2={0} />
+      <line x1={0} y1={-halfH} x2={0} y2={halfH} />
+      <rect
+        x={-halfW}
+        y={-halfH}
+        width={width}
+        height={height}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={Math.max(width, height) * 0.004}
+      />
     </g>
   );
 }
 
-function renderCone(
-  cone: SkidpadCone,
-  transform: SkidpadOverlayTransform,
-  showLabel: boolean,
-) {
-  const point = worldToScreen(cone.point.x, cone.point.y, transform);
+function TrackConeMark({
+  cone,
+  showLabel,
+}: {
+  cone: Cone;
+  showLabel: boolean;
+}) {
   const size = cone.type === "orange_big" ? 0.95 : 0.62;
   const base = size * 0.72;
 
   return (
     <g
-      key={cone.id}
       className={`cone ${cone.type}`}
       data-cone-type={cone.type}
       data-world-x={cone.point.x}
       data-world-y={cone.point.y}
-      transform={`translate(${point.x} ${point.y})`}
+      transform={`translate(${cone.point.x} ${-cone.point.y})`}
     >
       <circle r={size * 0.52} />
       <path d={`M${-base} ${base} L0 ${-size} L${base} ${base} Z`} />

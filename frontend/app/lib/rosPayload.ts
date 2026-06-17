@@ -1,32 +1,41 @@
 import {
-  SKIDPAD,
   type ConeWaypoint,
   type ObstacleBox,
   type RosPayload,
   type TrackPlacement,
 } from "./missionTypes";
+import type { TrackDimensions } from "./trackAdapter";
 import { roundGps, roundMeasurement } from "./trackGeometry";
+
+export type RosTrackInfo = {
+  id: string;
+  name: string;
+  discipline: string;
+  /** True cone bounding box of the selected track, in meters. */
+  dimensions: TrackDimensions;
+};
 
 export function buildRosPayload(
   track: TrackPlacement,
-  trackScale: number,
   waypoints: ConeWaypoint[],
   obstacles: ObstacleBox[],
+  trackInfo: RosTrackInfo,
 ): RosPayload {
   return {
     generated_at: new Date().toISOString(),
     track: {
+      id: trackInfo.id,
+      name: trackInfo.name,
+      discipline: trackInfo.discipline,
       center: {
         lat: roundGps(track.center.lat),
         lng: roundGps(track.center.lng),
       },
       rotation_degrees: track.rotation,
-      scale: Number(trackScale.toFixed(2)),
+      scale: 1,
       dimensions_meters: {
-        width: roundMeasurement(SKIDPAD.boundsWidthMeters * trackScale),
-        height: roundMeasurement(SKIDPAD.boundsHeightMeters * trackScale),
-        outer_diameter: roundMeasurement(SKIDPAD.outerDiameterMeters * trackScale),
-        inner_diameter: roundMeasurement(SKIDPAD.innerDiameterMeters * trackScale),
+        width: roundMeasurement(trackInfo.dimensions.width),
+        height: roundMeasurement(trackInfo.dimensions.height),
       },
     },
     points_to_mark: waypoints.map((waypoint) => ({

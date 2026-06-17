@@ -1,38 +1,42 @@
 import type { GpsCoordinate, Point } from "./mapMath";
 import {
+  clamp,
   gpsToMapPoint,
   gpsToWorldPixel,
   mapPointToGps,
+  metersPerPixel,
   offsetGpsByMeters,
   rotatePoint,
   worldPixelToGps,
 } from "./mapMath";
 import {
+  DEFAULT_ZOOM,
   MAP_SIZE,
   MAX_OSM_TILE_ZOOM,
+  MIN_ZOOM,
   OSM_TILE_URL,
   TILE_SIZE,
+  ZOOM_STEP,
+  type Cone,
   type ConeWaypoint,
   type MapRect,
   type MapTile,
   type ObstacleBox,
   type TrackPlacement,
 } from "./missionTypes";
-import { loadSkidpadCones } from "./skidpadCones";
 
-const SKIDPAD_CONES = loadSkidpadCones();
-
+/**
+ * Places meter-space cones onto the map at real-world size: rotate around the
+ * track origin {0,0}, then offset by the GPS `track.center`. Cones are expected
+ * to already be centered on the origin (see `prepareTrack`).
+ */
 export function buildConeWaypoints(
+  cones: readonly Cone[],
   track: TrackPlacement,
-  trackScale: number,
   zoom: number,
 ): ConeWaypoint[] {
-  return buildConePositionsMeters().map((cone) => {
-    const scaledPoint = {
-      x: cone.point.x * trackScale,
-      y: cone.point.y * trackScale,
-    };
-    const rotatedPoint = rotatePoint(scaledPoint, { x: 0, y: 0 }, -track.rotation);
+  return cones.map((cone) => {
+    const rotatedPoint = rotatePoint(cone.point, { x: 0, y: 0 }, -track.rotation);
 
     return {
       id: cone.id,
@@ -46,8 +50,43 @@ export function buildConeWaypoints(
   });
 }
 
-export function buildConePositionsMeters() {
-  return SKIDPAD_CONES;
+/**
+ * Fraction of the viewport the (padded) track may occupy when fitting. Leaves a
+ * comfortable margin and stays below the `trackWarning` threshold (0.9).
+ */
+const FIT_PADDING_FRACTION = 0.85;
+
+/**
+ * Picks the map zoom so a real-size track bounding box (in meters) fits inside
+ * the viewport with margin. The track is never scaled; only the zoom changes.
+ *
+ * meters-per-pixel = C / 2^zoom, so the zoom that yields the required
+ * meters-per-pixel is log2(C / requiredMpp). We floor to the zoom grid (so the
+ * track definitely fits) and clamp to [MIN_ZOOM, DEFAULT_ZOOM] — never auto
+ * zooming past the default keeps small tracks (e.g. skidpad) looking unchanged.
+ */
+export function computeFitZoom(
+  dimensionsMeters: { width: number; height: number },
+  latitude: number,
+  mapSize: Point = MAP_SIZE,
+): number {
+  const { width, height } = dimensionsMeters;
+
+  if (width <= 0 || height <= 0) {
+    return DEFAULT_ZOOM;
+  }
+
+  const requiredMetersPerPixel = Math.max(
+    width / (mapSize.x * FIT_PADDING_FRACTION),
+    height / (mapSize.y * FIT_PADDING_FRACTION),
+  );
+  const metersPerPixelAtZoomZero = metersPerPixel(latitude, 0);
+  const fitZoom = Math.log2(
+    metersPerPixelAtZoomZero / requiredMetersPerPixel,
+  );
+  const steppedZoom = Math.floor(fitZoom / ZOOM_STEP) * ZOOM_STEP;
+
+  return clamp(steppedZoom, MIN_ZOOM, DEFAULT_ZOOM);
 }
 
 export function pointsToRect(startPoint: Point, endPoint: Point): MapRect {

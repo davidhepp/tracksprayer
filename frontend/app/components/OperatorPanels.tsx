@@ -3,9 +3,6 @@ import type { ChangeEvent, FormEvent } from "react";
 import type { LogEntry } from "../lib/logger";
 import type { GpsCoordinate } from "../lib/mapMath";
 import {
-  MAX_TRACK_SCALE,
-  MIN_TRACK_SCALE,
-  SKIDPAD,
   type ConeWaypoint,
   type DevicePosition,
   type EditorMode,
@@ -13,7 +10,13 @@ import {
   type ObstacleBox,
   type TrackPlacement,
 } from "../lib/missionTypes";
+import type { TrackDimensions } from "../lib/trackAdapter";
 import { formatAccuracy } from "../lib/trackGeometry";
+import {
+  DISCIPLINE_LABELS,
+  type Discipline,
+  type TrackSummary,
+} from "../lib/tracksApi";
 
 type MissionControlsProps = {
   mapCenter: GpsCoordinate;
@@ -24,8 +27,14 @@ type MissionControlsProps = {
   searchError: string | null;
   isSearching: boolean;
   track: TrackPlacement;
-  trackScale: number;
   trackWarning: string | null;
+  tracks: TrackSummary[];
+  selectedTrackId: string;
+  trackName: string;
+  discipline: Discipline | null;
+  trackDimensions: TrackDimensions;
+  trackLoading: boolean;
+  trackError: string | null;
   editorMode: EditorMode;
   obstacleCount: number;
   coneWaypointsCount: number;
@@ -34,8 +43,8 @@ type MissionControlsProps = {
   onSearchQueryChange: (query: string) => void;
   onSelectLocation: (result: LocationSearchResult) => void;
   onRequestDeviceLocation: () => void;
+  onSelectTrack: (id: string) => void;
   onRotationChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onTrackScaleChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onResetTrack: () => void;
   onGenerateRoute: () => void;
   onEditorModeChange: (mode: EditorMode) => void;
@@ -89,8 +98,14 @@ export function MissionControls({
   searchError,
   isSearching,
   track,
-  trackScale,
   trackWarning,
+  tracks,
+  selectedTrackId,
+  trackName,
+  discipline,
+  trackDimensions,
+  trackLoading,
+  trackError,
   editorMode,
   obstacleCount,
   coneWaypointsCount,
@@ -99,8 +114,8 @@ export function MissionControls({
   onSearchQueryChange,
   onSelectLocation,
   onRequestDeviceLocation,
+  onSelectTrack,
   onRotationChange,
-  onTrackScaleChange,
   onResetTrack,
   onGenerateRoute,
   onEditorModeChange,
@@ -126,12 +141,18 @@ export function MissionControls({
       />
       <TrackSetupPanel
         track={track}
-        trackScale={trackScale}
         trackWarning={trackWarning}
+        tracks={tracks}
+        selectedTrackId={selectedTrackId}
+        trackName={trackName}
+        discipline={discipline}
+        trackDimensions={trackDimensions}
+        trackLoading={trackLoading}
+        trackError={trackError}
+        onSelectTrack={onSelectTrack}
         onGenerateRoute={onGenerateRoute}
         onResetTrack={onResetTrack}
         onRotationChange={onRotationChange}
-        onTrackScaleChange={onTrackScaleChange}
       />
       <ObstacleEditorPanel
         editorMode={editorMode}
@@ -526,35 +547,84 @@ function LocationPanel({
 
 function TrackSetupPanel({
   track,
-  trackScale,
   trackWarning,
+  tracks,
+  selectedTrackId,
+  trackName,
+  discipline,
+  trackDimensions,
+  trackLoading,
+  trackError,
+  onSelectTrack,
   onRotationChange,
-  onTrackScaleChange,
   onResetTrack,
   onGenerateRoute,
 }: {
   track: TrackPlacement;
-  trackScale: number;
   trackWarning: string | null;
+  tracks: TrackSummary[];
+  selectedTrackId: string;
+  trackName: string;
+  discipline: Discipline | null;
+  trackDimensions: TrackDimensions;
+  trackLoading: boolean;
+  trackError: string | null;
+  onSelectTrack: (id: string) => void;
   onRotationChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onTrackScaleChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onResetTrack: () => void;
   onGenerateRoute: () => void;
 }) {
+  const presetTracks = tracks.filter((item) => item.isPreset);
+  const generatedTracks = tracks.filter((item) => !item.isPreset);
+
   return (
     <section className="panel-section">
       <div className="section-heading">
         <p className="eyebrow">Track overlay</p>
-        <h2>Skidpad setup</h2>
+        <h2>Track setup</h2>
       </div>
+      <label className="field-control">
+        <span>Track</span>
+        <select
+          value={selectedTrackId}
+          disabled={trackLoading || tracks.length === 0}
+          onChange={(event) => onSelectTrack(event.target.value)}
+        >
+          {tracks.length === 0 && <option value="">No tracks available</option>}
+          {presetTracks.length > 0 && (
+            <optgroup label="Standard presets">
+              {presetTracks.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {generatedTracks.length > 0 && (
+            <optgroup label="Generated">
+              {generatedTracks.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+      </label>
+      {trackError && (
+        <p className="process-error" role="status">
+          {trackError}
+        </p>
+      )}
       <div className="dimension-list">
-        <span>Scale: {Math.round(trackScale * 100)}%</span>
         <span>
-          Size: {(SKIDPAD.boundsWidthMeters * trackScale).toFixed(1)} x{" "}
-          {(SKIDPAD.boundsHeightMeters * trackScale).toFixed(1)} m
+          {trackName || "Track"}
+          {discipline ? ` · ${DISCIPLINE_LABELS[discipline]}` : ""}
+          {trackLoading ? " (loading…)" : ""}
         </span>
         <span>
-          Outer circle: {(SKIDPAD.outerDiameterMeters * trackScale).toFixed(1)} m
+          Size: {trackDimensions.width.toFixed(1)} x{" "}
+          {trackDimensions.height.toFixed(1)} m (real size)
         </span>
       </div>
       <label className="range-control">
@@ -568,18 +638,6 @@ function TrackSetupPanel({
           onChange={onRotationChange}
         />
         <strong>{track.rotation} deg</strong>
-      </label>
-      <label className="range-control">
-        <span>Scale</span>
-        <input
-          min={MIN_TRACK_SCALE}
-          max={MAX_TRACK_SCALE}
-          step="0.05"
-          type="range"
-          value={trackScale}
-          onChange={onTrackScaleChange}
-        />
-        <strong>{Math.round(trackScale * 100)}%</strong>
       </label>
       {trackWarning && (
         <p className="warning-banner" role="status">
