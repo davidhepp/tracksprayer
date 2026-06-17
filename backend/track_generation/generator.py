@@ -48,42 +48,6 @@ def _circle_cones(center: tuple[float, float], radius: float, angles_deg) -> lis
     return cones
 
 
-def build_skidpad() -> TrackGeometry:
-    """Standard FS skidpad (figure-of-eight), deterministic.
-
-    Inner circle diameter 15.25 m, outer 21.25 m (3 m lane), circle centers
-    18.25 m apart, 16 inner + 13 outer cones per circle.
-    """
-    inner_r = 15.25 / 2
-    outer_r = 21.25 / 2
-    half_offset = 18.25 / 2
-    top = (0.0, half_offset)
-    bottom = (0.0, -half_offset)
-
-    inner_top = _circle_cones(top, inner_r, [-90 + 22.5 * k for k in range(16)])
-    inner_bottom = _circle_cones(bottom, inner_r, [90 + 22.5 * k for k in range(16)])
-    outer_top = _circle_cones(top, outer_r, [-45 + 22.5 * k for k in range(13)])
-    outer_bottom = _circle_cones(bottom, outer_r, [135 + 22.5 * k for k in range(13)])
-
-    cones_right = inner_top + outer_bottom
-    cones_left = outer_top + inner_bottom
-
-    cones_orange = []
-    for x in (11.0, 15.0, 19.0):
-        for sx in (-1.0, 1.0):
-            for sy in (-1.65, 1.65):
-                cones_orange.append([round(sx * x, 4), sy])
-
-    cones_orange_big = [[-1.3, 2.0], [-1.3, -2.0], [1.3, 2.0], [1.3, -2.0]]
-
-    return TrackGeometry(
-        cones_left=cones_left,
-        cones_right=cones_right,
-        cones_orange=cones_orange,
-        cones_orange_big=cones_orange_big,
-        starting_pose=[-15.0, 0.0, 0.0],
-        tk_device=[[0.0, 2.0], [0.0, -2.0]],
-    )
 
 
 def _straight_track(length: float, width: float, spacing: float = 5.0) -> TrackGeometry:
@@ -111,10 +75,6 @@ def _straight_track(length: float, width: float, spacing: float = 5.0) -> TrackG
         ],
     )
 
-
-def build_acceleration() -> TrackGeometry:
-    """FS acceleration: 75 m straight, 3 m wide, cones ~5 m, big orange at ends."""
-    return _straight_track(length=75.0, width=3.0, spacing=5.0)
 
 
 def build_ebs_test() -> TrackGeometry:
