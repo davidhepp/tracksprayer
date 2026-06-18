@@ -107,10 +107,36 @@ ubuntu ALL=(ALL) NOPASSWD: /usr/bin/pigpiod
 
 ## One-Time App Setup
 
+The frontend requires Node `20.19+` or `22.12+` and npm `10+`. The vague npm
+error `Cannot read properties of undefined (reading '@react-router/node')`
+usually means the Pi is using an old Node/npm from `apt`.
+
+Check the installed versions:
+
+```bash
+node -v
+npm -v
+```
+
+If Node is older than `20.19` or npm is older than `10`, install Node 22:
+
+```bash
+sudo apt remove -y nodejs npm
+sudo apt update
+sudo apt install -y curl ca-certificates
+curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
+sudo -E bash nodesource_setup.sh
+sudo apt install -y nodejs
+
+node -v
+npm -v
+```
+
 Install frontend dependencies:
 
 ```bash
 cd /home/ubuntu/tracksprayer/frontend
+rm -rf node_modules
 npm ci
 ```
 
