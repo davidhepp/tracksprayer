@@ -19,7 +19,7 @@ from settings import (
 
 LogLevel = Literal["stdout", "stderr"]
 ProcessState = Literal["already_running", "started", "stopping", "not_running"]
-Message = dict[str, Any]
+Message = dict
 
 
 class ProcessManager:
