@@ -202,9 +202,8 @@ export default function Home() {
 
   useEffect(() => {
     let isActive = true;
-    const socket = new WebSocket(backendWsUrl());
-
-    setProcessConnection("connecting");
+    let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     fetch(`${BACKEND_HTTP_BASE_URL}/process/status`)
       .then((response) => {
@@ -243,79 +242,110 @@ export default function Home() {
         addLog("warn", message);
       });
 
-    socket.addEventListener("open", () => {
+    const scheduleReconnect = () => {
+      if (!isActive || reconnectTimer !== null) {
+        return;
+      }
+
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectProcessSocket();
+      }, 1500);
+    };
+
+    const connectProcessSocket = () => {
       if (!isActive) {
         return;
       }
 
-      setProcessConnection("connected");
-      setProcessError(null);
-    });
+      const wsUrl = backendWsUrl();
+      writeConsoleLog("TrackSprayer UI", "info", "Connecting process WebSocket.", {
+        wsUrl,
+      });
+      setProcessConnection("connecting");
 
-    socket.addEventListener("message", (event) => {
-      if (!isActive) {
-        return;
-      }
+      socket = new WebSocket(wsUrl);
 
-      const message = JSON.parse(event.data) as ProcessSocketMessage;
-
-      if (message.type === "process_status") {
-        setProcessStatuses((current) => ({
-          ...current,
-          [message.process]: message.status,
-        }));
-        setProcessPids((current) => ({
-          ...current,
-          [message.process]: message.pid ?? null,
-        }));
-        setProcessExitCodes((current) => ({
-          ...current,
-          [message.process]:
-            message.status === "stopped" ? message.exit_code ?? null : null,
-        }));
-        if (message.process === "localization" && message.status !== "running") {
-          setRobotReady(false);
-          setMissionFilesSaved(false);
+      socket.addEventListener("open", () => {
+        if (!isActive) {
+          return;
         }
-        if (message.process === "navigation" && message.status === "running") {
-          setMissionFilesSaved(true);
+
+        setProcessConnection("connected");
+        setProcessError(null);
+      });
+
+      socket.addEventListener("message", (event) => {
+        if (!isActive) {
+          return;
         }
-        return;
-      }
 
-      if (message.type === "log") {
-        setProcessLogs((current) => [
-          {
-            id: Date.now() + Math.random(),
-            process: message.process,
-            level: message.level,
-            message: message.message,
-          },
-          ...current.slice(0, 99),
-        ]);
-      }
-    });
+        const message = JSON.parse(event.data) as ProcessSocketMessage;
 
-    socket.addEventListener("close", () => {
-      if (!isActive) {
-        return;
-      }
+        if (message.type === "process_status") {
+          setProcessStatuses((current) => ({
+            ...current,
+            [message.process]: message.status,
+          }));
+          setProcessPids((current) => ({
+            ...current,
+            [message.process]: message.pid ?? null,
+          }));
+          setProcessExitCodes((current) => ({
+            ...current,
+            [message.process]:
+              message.status === "stopped" ? message.exit_code ?? null : null,
+          }));
+          if (message.process === "localization" && message.status !== "running") {
+            setRobotReady(false);
+            setMissionFilesSaved(false);
+          }
+          if (message.process === "navigation" && message.status === "running") {
+            setMissionFilesSaved(true);
+          }
+          return;
+        }
 
-      setProcessConnection("disconnected");
-    });
+        if (message.type === "log") {
+          setProcessLogs((current) => [
+            {
+              id: Date.now() + Math.random(),
+              process: message.process,
+              level: message.level,
+              message: message.message,
+            },
+            ...current.slice(0, 99),
+          ]);
+        }
+      });
 
-    socket.addEventListener("error", () => {
-      if (!isActive) {
-        return;
-      }
+      socket.addEventListener("close", () => {
+        if (!isActive) {
+          return;
+        }
 
-      setProcessConnection("disconnected");
-      setProcessError("Process WebSocket is not connected.");
-    });
+        setProcessConnection("disconnected");
+        scheduleReconnect();
+      });
+
+      socket.addEventListener("error", () => {
+        if (!isActive) {
+          return;
+        }
+
+        setProcessConnection("disconnected");
+        setProcessError("Process WebSocket is not connected.");
+      });
+    };
+
+    connectProcessSocket();
 
     return () => {
       isActive = false;
-      socket.close();
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+      }
+      socket?.close();
     };
   }, [addLog]);
 
