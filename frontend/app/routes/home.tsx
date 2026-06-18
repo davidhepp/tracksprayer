@@ -110,6 +110,14 @@ type BackendProcessStatus = Record<
   }
 >;
 
+type RobotGpsFixResponse = {
+  ok: boolean;
+  lat: number;
+  lng: number;
+  accuracy_meters: number | null;
+  status: number | null;
+};
+
 function backendWsUrl() {
   const url = new URL(BACKEND_HTTP_BASE_URL);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -858,52 +866,47 @@ export default function Home() {
     addLog("info", `Map zoom set to z${formatZoom(constrainedZoom)}.`);
   };
 
-  const requestDeviceLocation = () => {
-    if (!("geolocation" in navigator)) {
-      addLog("warn", "Browser geolocation is not available.");
-      return;
-    }
+  const requestDeviceLocation = async () => {
+    addLog("info", "Requesting robot GPS fix.");
 
-    addLog("info", "Requesting browser geolocation.");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coordinate = {
-          lat: Number(position.coords.latitude.toFixed(7)),
-          lng: Number(position.coords.longitude.toFixed(7)),
-        };
-        const acquiredAt = new Date(position.timestamp).toLocaleTimeString(
-          "en-GB",
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          },
-        );
+    try {
+      const response = await fetch(`${BACKEND_HTTP_BASE_URL}/robot/gps/fix`);
+      if (!response.ok) {
+        throw new Error(`Robot GPS fix failed with ${response.status}.`);
+      }
 
-        setDevicePosition({
-          coordinate,
-          accuracyMeters: Number.isFinite(position.coords.accuracy)
-            ? Math.round(position.coords.accuracy)
+      const result = (await response.json()) as RobotGpsFixResponse;
+      const coordinate = {
+        lat: result.lat,
+        lng: result.lng,
+      };
+      const acquiredAt = new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      setDevicePosition({
+        coordinate,
+        accuracyMeters:
+          typeof result.accuracy_meters === "number"
+            ? Math.round(result.accuracy_meters)
             : null,
-          acquiredAt,
-        });
-        setMapCenter(coordinate);
-        setTrack((current) => ({ ...current, center: coordinate }));
-        setConeWaypoints([]);
-        addLog("info", "Browser geolocation received and map recentered.", {
-          coordinate,
-          accuracyMeters: position.coords.accuracy,
-        });
-      },
-      (error) => {
-        addLog("warn", `Browser geolocation failed: ${error.message}`);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 5_000,
-        timeout: 10_000,
-      },
-    );
+        acquiredAt,
+      });
+      setMapCenter(coordinate);
+      setTrack((current) => ({ ...current, center: coordinate }));
+      setConeWaypoints([]);
+      addLog("info", "Robot GPS fix received and map recentered.", {
+        coordinate,
+        accuracyMeters: result.accuracy_meters,
+        status: result.status,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Robot GPS fix failed.";
+      addLog("warn", message);
+    }
   };
 
   const handleLocationSearch = async (event: FormEvent) => {

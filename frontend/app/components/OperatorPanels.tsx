@@ -509,7 +509,7 @@ function LocationPanel({
         coordinate={mapCenter}
         detail={
           devicePosition
-            ? `Device GPS, ${formatAccuracy(devicePosition.accuracyMeters)}`
+            ? `Robot GPS, ${formatAccuracy(devicePosition.accuracyMeters)}`
             : "Default: Schweinfurt, Germany"
         }
       />
@@ -518,7 +518,7 @@ function LocationPanel({
         className="primary-button full-width-button"
         onClick={onRequestDeviceLocation}
       >
-        Use device GPS
+        Use robot GPS
       </button>
     </section>
   );

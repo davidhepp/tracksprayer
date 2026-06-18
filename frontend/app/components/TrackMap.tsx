@@ -190,7 +190,7 @@ export function TrackMap({
           hasObstacles={obstacleCount > 0}
         />
         <div className="gps-readout">
-          <span>{devicePosition ? "Device GPS" : "Map center"}</span>
+          <span>{devicePosition ? "Robot GPS" : "Map center"}</span>
           <strong>
             {(devicePosition?.coordinate ?? mapCenter).lat.toFixed(6)},{" "}
             {(devicePosition?.coordinate ?? mapCenter).lng.toFixed(6)}
@@ -398,7 +398,7 @@ function MapLegend({
     <div className="legend" aria-label="Map legend">
       {hasDevicePosition && (
         <span>
-          <i className="legend-current" /> Device GPS
+          <i className="legend-current" /> Robot GPS
         </span>
       )}
       <span>

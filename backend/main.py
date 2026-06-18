@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 import platform
 import subprocess
 from pathlib import Path
@@ -13,6 +14,9 @@ from process_manager import process_manager
 from settings import (
     CORS_ORIGINS,
     OBSTACLES_FILE,
+    ROSBRIDGE_GPS_FIX_TIMEOUT_SECONDS,
+    ROSBRIDGE_GPS_FIX_TOPIC,
+    ROSBRIDGE_GPS_FIX_TYPE,
     ROSBRIDGE_READY_TOPIC,
     ROSBRIDGE_READY_TIMEOUT_SECONDS,
     ROSBRIDGE_READY_TYPE,
@@ -167,6 +171,48 @@ async def wait_for_robot_ready() -> Dict[str, Union[bool, str]]:
     }
 
 
+@app.get("/robot/gps/fix")
+async def get_robot_gps_fix() -> Dict[str, Union[bool, float, int, str, None]]:
+    if not ROSBRIDGE_URL:
+        return {
+            "ok": True,
+            "mode": "mock_rosbridge",
+            "source": "mock_robot",
+            "topic": ROSBRIDGE_GPS_FIX_TOPIC,
+            "lat": 50.04937,
+            "lng": 10.22175,
+            "accuracy_meters": None,
+            "status": None,
+        }
+
+    try:
+        fix = await asyncio.wait_for(
+            _wait_for_robot_gps_fix(),
+            timeout=ROSBRIDGE_GPS_FIX_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                f"Robot GPS fix was not received on {ROSBRIDGE_GPS_FIX_TOPIC} "
+                f"within {ROSBRIDGE_GPS_FIX_TIMEOUT_SECONDS:g}s."
+            ),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"ROS bridge GPS fix receive failed: {exc}",
+        ) from exc
+
+    return {
+        "ok": True,
+        "mode": "rosbridge",
+        "source": "robot",
+        "topic": ROSBRIDGE_GPS_FIX_TOPIC,
+        **fix,
+    }
+
+
 async def _wait_for_robot_ready() -> None:
     import websockets
 
@@ -185,6 +231,80 @@ async def _wait_for_robot_ready() -> None:
 
             if _is_robot_ready_message(message):
                 return
+
+
+async def _wait_for_robot_gps_fix() -> Dict[str, Union[float, int, None]]:
+    import websockets
+
+    subscribe_message = {
+        "op": "subscribe",
+        "topic": ROSBRIDGE_GPS_FIX_TOPIC,
+        "type": ROSBRIDGE_GPS_FIX_TYPE,
+    }
+
+    async with websockets.connect(ROSBRIDGE_URL) as websocket:
+        await websocket.send(json.dumps(subscribe_message))
+
+        while True:
+            raw_message = await websocket.recv()
+            message = json.loads(raw_message)
+
+            fix = _robot_gps_fix_from_message(message)
+            if fix is not None:
+                return fix
+
+
+def _robot_gps_fix_from_message(
+    message: Any,
+) -> Union[Dict[str, Union[float, int, None]], None]:
+    if not isinstance(message, dict):
+        return None
+
+    if message.get("op") != "publish" or message.get("topic") != ROSBRIDGE_GPS_FIX_TOPIC:
+        return None
+
+    msg = message.get("msg")
+    if not isinstance(msg, dict):
+        return None
+
+    try:
+        lat = float(msg["latitude"])
+        lng = float(msg["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    if not math.isfinite(lat) or not math.isfinite(lng):
+        return None
+
+    status = None
+    raw_status = msg.get("status")
+    if isinstance(raw_status, dict):
+        raw_status_value = raw_status.get("status")
+        if isinstance(raw_status_value, int):
+            status = raw_status_value
+
+    return {
+        "lat": round(lat, 7),
+        "lng": round(lng, 7),
+        "accuracy_meters": _gps_accuracy_from_covariance(msg),
+        "status": status,
+    }
+
+
+def _gps_accuracy_from_covariance(msg: Dict[str, Any]) -> Union[float, None]:
+    covariance = msg.get("position_covariance")
+    if not isinstance(covariance, list) or len(covariance) < 5:
+        return None
+
+    try:
+        variance = max(float(covariance[0]), float(covariance[4]))
+    except (TypeError, ValueError):
+        return None
+
+    if variance < 0 or not math.isfinite(variance):
+        return None
+
+    return round(math.sqrt(variance), 2)
 
 
 def _is_robot_ready_message(message: Any) -> bool:

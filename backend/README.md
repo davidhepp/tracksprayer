@@ -38,6 +38,7 @@ POST /process/navigation/start
 POST /process/{localization|navigation}/stop
 GET  /process/status
 POST /robot/ready
+GET  /robot/gps/fix
 POST /mission/files
 WS   /ws/process
 ```
@@ -46,3 +47,6 @@ WS   /ws/process
 subscribes through rosbridge and waits for one of `TRACKSPRAYER_READY_VALUES`
 on `TRACKSPRAYER_READY_TOPIC`. The default is `/gps/quality` with values `4`
 or `5`.
+
+`/robot/gps/fix` subscribes through rosbridge to `/gps/fix` by default and
+returns one `sensor_msgs/NavSatFix` sample for recentering the frontend map.
