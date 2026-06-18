@@ -65,7 +65,8 @@ TRACKSPRAYER_MODE=dev
 
 ## Frontend Environment
 
-If the browser opens the frontend from another computer on the network, create
+The frontend automatically connects to port `8000` on the same host that served
+the page. If the backend runs on a different host, create
 `/home/ubuntu/tracksprayer/frontend/.env`:
 
 ```bash
@@ -74,8 +75,7 @@ VITE_ROBOT_BACKEND_URL=http://<PI_IP>:8000
 
 Replace `<PI_IP>` with the Raspberry Pi IP address.
 
-If you open the frontend directly on the Pi, this file is optional because the
-frontend defaults to `http://localhost:8000`.
+For the normal Pi setup, this file is optional.
 
 ## One-Time ROS Setup
 

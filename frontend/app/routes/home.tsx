@@ -56,8 +56,19 @@ import {
 } from "../lib/trackGeometry";
 import type { Route } from "./+types/home";
 
-const BACKEND_HTTP_BASE_URL =
-  import.meta.env.VITE_ROBOT_BACKEND_URL ?? "http://localhost:8000";
+function backendHttpBaseUrl() {
+  if (import.meta.env.VITE_ROBOT_BACKEND_URL) {
+    return import.meta.env.VITE_ROBOT_BACKEND_URL;
+  }
+
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+
+  return "http://localhost:8000";
+}
+
+const BACKEND_HTTP_BASE_URL = backendHttpBaseUrl();
 
 const initialTrack = {
   center: SCHWEINFURT_CENTER,
