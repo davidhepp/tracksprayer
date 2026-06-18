@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import os
 import signal
@@ -19,7 +17,7 @@ from settings import (
 
 LogLevel = Literal["stdout", "stderr"]
 ProcessState = Literal["already_running", "started", "stopping", "not_running"]
-Message = dict
+Message = dict[str, Any]
 
 
 class ProcessManager:
