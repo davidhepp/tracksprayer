@@ -45,10 +45,9 @@ TRACKSPRAYER_SHARED_DIR=/home/ubuntu/trackSprayRobot/shared_files
 TRACKSPRAYER_WAYPOINTS_FILE=/home/ubuntu/trackSprayRobot/shared_files/waypoints.json
 TRACKSPRAYER_OBSTACLES_FILE=/home/ubuntu/trackSprayRobot/shared_files/obstacles.json
 TRACKSPRAYER_ROSBRIDGE_URL=ws://localhost:9090
-TRACKSPRAYER_READY_TOPIC=/robot_status
-TRACKSPRAYER_READY_TYPE=robot_msgs/RobotStatus
-TRACKSPRAYER_READY_CODE=RTK_READY
-TRACKSPRAYER_READY_SOURCE=navigation
+TRACKSPRAYER_READY_TOPIC=/gps/quality
+TRACKSPRAYER_READY_TYPE=std_msgs/UInt8
+TRACKSPRAYER_READY_VALUES=4,5
 TRACKSPRAYER_READY_TIMEOUT_SECONDS=30
 TRACKSPRAYER_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://<PI_IP>:5173
 ```
@@ -158,7 +157,7 @@ http://<PI_IP>:5173
 ## Robot Workflow
 
 1. Click `Start localization`.
-2. Click the READY action and wait for `/robot_status` with code `RTK_READY`.
+2. Click the READY action and wait for `/gps/quality` to publish `4` or `5`.
 3. Save mission files. The backend writes:
    - `/home/ubuntu/trackSprayRobot/shared_files/waypoints.json`
    - `/home/ubuntu/trackSprayRobot/shared_files/obstacles.json`

@@ -60,6 +60,19 @@ def _list_from_env(name: str, fallback: List[str]) -> List[str]:
     return values or fallback
 
 
+def _int_list_from_env(name: str, fallback: List[int]) -> List[int]:
+    raw_values = _list_from_env(name, [str(value) for value in fallback])
+    values: List[int] = []
+
+    for raw_value in raw_values:
+        try:
+            values.append(int(raw_value))
+        except ValueError:
+            continue
+
+    return values or fallback
+
+
 TRACKSPRAYER_MODE = os.getenv("TRACKSPRAYER_MODE", "dev").strip().lower()
 IS_MOCK_MODE = TRACKSPRAYER_MODE in {"dev", "mock", "test"}
 
@@ -130,13 +143,12 @@ ROSBRIDGE_URL = "" if IS_MOCK_MODE else os.getenv(
     "TRACKSPRAYER_ROSBRIDGE_URL",
     _rosbridge_url_fallback,
 )
-ROSBRIDGE_READY_TOPIC = os.getenv("TRACKSPRAYER_READY_TOPIC", "/robot_status")
-ROSBRIDGE_READY_TYPE = os.getenv("TRACKSPRAYER_READY_TYPE", "robot_msgs/RobotStatus")
-ROSBRIDGE_READY_CODE = os.getenv("TRACKSPRAYER_READY_CODE", "RTK_READY")
-ROSBRIDGE_READY_SOURCE = os.getenv("TRACKSPRAYER_READY_SOURCE", "navigation")
+ROSBRIDGE_READY_TOPIC = os.getenv("TRACKSPRAYER_READY_TOPIC", "/gps/quality")
+ROSBRIDGE_READY_TYPE = os.getenv("TRACKSPRAYER_READY_TYPE", "std_msgs/UInt8")
+ROSBRIDGE_READY_VALUES = _int_list_from_env("TRACKSPRAYER_READY_VALUES", [4, 5])
 ROSBRIDGE_READY_TIMEOUT_SECONDS = _float_from_env(
     "TRACKSPRAYER_READY_TIMEOUT_SECONDS",
-    10.0,
+    30.0,
 )
 
 CORS_ORIGINS = _list_from_env(

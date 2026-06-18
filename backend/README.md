@@ -43,5 +43,6 @@ WS   /ws/process
 ```
 
 `/robot/ready` is mocked when `TRACKSPRAYER_MODE=dev`. In real mode it
-subscribes through rosbridge and waits for `TRACKSPRAYER_READY_CODE` on
-`TRACKSPRAYER_READY_TOPIC`.
+subscribes through rosbridge and waits for one of `TRACKSPRAYER_READY_VALUES`
+on `TRACKSPRAYER_READY_TOPIC`. The default is `/gps/quality` with values `4`
+or `5`.

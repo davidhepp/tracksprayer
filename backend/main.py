@@ -13,11 +13,10 @@ from process_manager import process_manager
 from settings import (
     CORS_ORIGINS,
     OBSTACLES_FILE,
-    ROSBRIDGE_READY_CODE,
-    ROSBRIDGE_READY_SOURCE,
     ROSBRIDGE_READY_TOPIC,
     ROSBRIDGE_READY_TIMEOUT_SECONDS,
     ROSBRIDGE_READY_TYPE,
+    ROSBRIDGE_READY_VALUES,
     ROSBRIDGE_URL,
     WAYPOINTS_FILE,
 )
@@ -136,6 +135,7 @@ async def wait_for_robot_ready() -> Dict[str, Union[bool, str]]:
             "status": "ready_received",
             "source": "mock_robot",
             "topic": ROSBRIDGE_READY_TOPIC,
+            "ready_values": ",".join(str(value) for value in ROSBRIDGE_READY_VALUES),
         }
 
     try:
@@ -163,7 +163,7 @@ async def wait_for_robot_ready() -> Dict[str, Union[bool, str]]:
         "status": "ready_received",
         "source": "robot",
         "topic": ROSBRIDGE_READY_TOPIC,
-        "code": ROSBRIDGE_READY_CODE,
+        "ready_values": ",".join(str(value) for value in ROSBRIDGE_READY_VALUES),
     }
 
 
@@ -198,13 +198,32 @@ def _is_robot_ready_message(message: Any) -> bool:
     if not isinstance(msg, dict):
         return False
 
-    if msg.get("data") is True:
-        return True
-
-    if ROSBRIDGE_READY_SOURCE and msg.get("source") != ROSBRIDGE_READY_SOURCE:
+    quality = _message_data_as_int(msg)
+    if quality is None:
         return False
 
-    return msg.get("code") == ROSBRIDGE_READY_CODE
+    return quality in ROSBRIDGE_READY_VALUES
+
+
+def _message_data_as_int(msg: Dict[str, Any]) -> Union[int, None]:
+    value = msg.get("data")
+
+    if isinstance(value, bool):
+        return int(value)
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    return None
 
 
 def _write_json_atomic(path: Path, data: Any) -> None:
