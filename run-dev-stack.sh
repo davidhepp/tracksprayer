@@ -5,10 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 
-FRONTEND_CMD=(bun run dev)
+FRONTEND_CMD=(bun run dev --host 0.0.0.0)
 
 if ! command -v bun >/dev/null 2>&1; then
-  FRONTEND_CMD=(npm run dev)
+  FRONTEND_CMD=(npm run dev -- --host 0.0.0.0)
 fi
 
 backend_pid=""
