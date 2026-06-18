@@ -2,7 +2,7 @@ import asyncio
 import os
 import signal
 from collections import deque
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Deque, Dict, List, Literal, Optional, Set, Union
 
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -17,11 +17,11 @@ from settings import (
 
 LogLevel = Literal["stdout", "stderr"]
 ProcessState = Literal["already_running", "started", "stopping", "not_running"]
-Message = dict[str, Any]
+Message = Dict[str, Any]
 
 
 class ProcessManager:
-    _instance: ClassVar["ProcessManager | None"] = None
+    _instance: ClassVar[Optional["ProcessManager"]] = None
 
     def __new__(cls) -> "ProcessManager":
         if cls._instance is None:
@@ -32,16 +32,16 @@ class ProcessManager:
         if getattr(self, "_initialized", False):
             return
 
-        self._processes: dict[str, asyncio.subprocess.Process] = {}
-        self._clients: set[WebSocket] = set()
-        self._log_buffer: deque[Message] = deque(maxlen=200)
+        self._processes: Dict[str, asyncio.subprocess.Process] = {}
+        self._clients: Set[WebSocket] = set()
+        self._log_buffer: Deque[Message] = deque(maxlen=200)
         self._lock = asyncio.Lock()
-        self._reader_tasks: dict[str, set[asyncio.Task[None]]] = {}
-        self._watch_tasks: dict[str, asyncio.Task[None]] = {}
+        self._reader_tasks: Dict[str, Set[asyncio.Task]] = {}
+        self._watch_tasks: Dict[str, asyncio.Task] = {}
         self._shutdown_timeout_seconds = 5.0
         self._initialized = True
 
-    def status(self) -> dict[str, dict[str, bool | int]]:
+    def status(self) -> Dict[str, Dict[str, Union[bool, int]]]:
         return {
             name: self._process_status(name)
             for name in PROCESS_DEFINITIONS
@@ -155,7 +155,7 @@ class ProcessManager:
             known = ", ".join(PROCESS_DEFINITIONS)
             raise ValueError(f"Unknown process '{name}'. Expected one of: {known}") from exc
 
-    def _process_status(self, name: str) -> dict[str, bool | int]:
+    def _process_status(self, name: str) -> Dict[str, Union[bool, int]]:
         process = self._processes.get(name)
         if process is not None and process.returncode is None:
             return {"running": True, "pid": process.pid}
@@ -165,8 +165,8 @@ class ProcessManager:
         process = self._processes.get(name)
         return process is not None and process.returncode is None
 
-    def _current_status_messages(self) -> list[Message]:
-        messages: list[Message] = []
+    def _current_status_messages(self) -> List[Message]:
+        messages: List[Message] = []
         for name in PROCESS_DEFINITIONS:
             process = self._processes.get(name)
             if process is not None and process.returncode is None:
@@ -191,7 +191,7 @@ class ProcessManager:
     async def _stream_output(
         self,
         name: str,
-        stream: asyncio.StreamReader | None,
+        stream: Optional[asyncio.StreamReader],
         level: LogLevel,
     ) -> None:
         if stream is None:
@@ -215,7 +215,7 @@ class ProcessManager:
         self,
         name: str,
         process: asyncio.subprocess.Process,
-        reader_tasks: set[asyncio.Task[None]],
+        reader_tasks: Set[asyncio.Task],
     ) -> None:
         exit_code = await process.wait()
 
@@ -241,7 +241,7 @@ class ProcessManager:
         if not self._clients:
             return
 
-        disconnected: set[WebSocket] = set()
+        disconnected: Set[WebSocket] = set()
         for websocket in set(self._clients):
             try:
                 if websocket.client_state == WebSocketState.CONNECTED:

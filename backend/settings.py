@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List
 
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -50,7 +51,7 @@ def _float_from_env(name: str, fallback: float) -> float:
         return fallback
 
 
-def _list_from_env(name: str, fallback: list[str]) -> list[str]:
+def _list_from_env(name: str, fallback: List[str]) -> List[str]:
     raw_value = os.getenv(name)
     if raw_value is None:
         return fallback

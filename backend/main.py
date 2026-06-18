@@ -3,7 +3,7 @@ import json
 import platform
 import subprocess
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Dict, List, Literal, Union
 
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,15 +35,15 @@ app.add_middleware(
 
 
 class MissionFilesRequest(BaseModel):
-    waypoints: list[dict]
-    obstacles: list[dict]
+    waypoints: List[Dict[str, Any]]
+    obstacles: List[Dict[str, Any]]
 
 
 class MissionFileRevealRequest(BaseModel):
     kind: Literal["waypoints", "obstacles"]
 
 
-async def _start_process(name: str) -> dict[str, bool | str]:
+async def _start_process(name: str) -> Dict[str, Union[bool, str]]:
     try:
         status = await process_manager.start(name)
     except FileNotFoundError as exc:
@@ -60,22 +60,22 @@ async def _start_process(name: str) -> dict[str, bool | str]:
 
 
 @app.post("/process/localization/start")
-async def start_localization() -> dict[str, bool | str]:
+async def start_localization() -> Dict[str, Union[bool, str]]:
     return await _start_process("localization")
 
 
 @app.post("/process/navigation/start")
-async def start_navigation() -> dict[str, bool | str]:
+async def start_navigation() -> Dict[str, Union[bool, str]]:
     return await _start_process("navigation")
 
 
 @app.post("/process/{name}/start")
-async def start_named_process(name: str) -> dict[str, bool | str]:
+async def start_named_process(name: str) -> Dict[str, Union[bool, str]]:
     return await _start_process(name)
 
 
 @app.post("/process/{name}/stop")
-async def stop_process(name: str) -> dict[str, bool | str]:
+async def stop_process(name: str) -> Dict[str, Union[bool, str]]:
     try:
         status = await process_manager.stop(name)
     except ValueError as exc:
@@ -85,12 +85,14 @@ async def stop_process(name: str) -> dict[str, bool | str]:
 
 
 @app.get("/process/status")
-async def process_status() -> dict[str, dict[str, bool | int]]:
+async def process_status() -> Dict[str, Dict[str, Union[bool, int]]]:
     return process_manager.status()
 
 
 @app.post("/mission/files")
-async def save_mission_files(payload: MissionFilesRequest) -> dict[str, bool | str]:
+async def save_mission_files(
+    payload: MissionFilesRequest,
+) -> Dict[str, Union[bool, str]]:
     WAYPOINTS_FILE.parent.mkdir(parents=True, exist_ok=True)
     OBSTACLES_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -105,7 +107,9 @@ async def save_mission_files(payload: MissionFilesRequest) -> dict[str, bool | s
 
 
 @app.post("/mission/files/reveal")
-async def reveal_mission_file(payload: MissionFileRevealRequest) -> dict[str, bool | str]:
+async def reveal_mission_file(
+    payload: MissionFileRevealRequest,
+) -> Dict[str, Union[bool, str]]:
     path = WAYPOINTS_FILE if payload.kind == "waypoints" else OBSTACLES_FILE
 
     if not path.exists():
@@ -123,7 +127,7 @@ async def reveal_mission_file(payload: MissionFileRevealRequest) -> dict[str, bo
 
 
 @app.post("/robot/ready")
-async def wait_for_robot_ready() -> dict[str, bool | str]:
+async def wait_for_robot_ready() -> Dict[str, Union[bool, str]]:
     if not ROSBRIDGE_URL:
         await asyncio.sleep(0.35)
         return {
