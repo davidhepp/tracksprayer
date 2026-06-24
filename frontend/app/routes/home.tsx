@@ -9,6 +9,8 @@ import {
   type PointerEvent,
 } from "react";
 
+import { Link } from "react-router";
+
 import { DebugPanel, MissionControls } from "../components/OperatorPanels";
 import { TrackMap } from "../components/TrackMap";
 import { createLogEntry, writeConsoleLog } from "../lib/logger";
@@ -25,14 +27,11 @@ import {
   DEFAULT_ZOOM,
   MAP_SIZE,
   MAX_LOG_ENTRIES,
-  MAX_TRACK_SCALE,
   MAX_ZOOM,
   MIN_OBSTACLE_SIZE_PX,
-  MIN_TRACK_SCALE,
   MIN_ZOOM,
   OSM_TILE_URL,
   SCHWEINFURT_CENTER,
-  SKIDPAD,
   ZOOM_STEP,
   type DevicePosition,
   type ConeWaypoint,
@@ -43,10 +42,13 @@ import {
   type TrackPlacement,
 } from "../lib/missionTypes";
 import { buildRosPayload } from "../lib/rosPayload";
+import { prepareTrack, type PreparedTrack } from "../lib/trackAdapter";
+import { getTrack, listTracks, type TrackSummary } from "../lib/tracksApi";
 import {
   angleBetween,
   buildConeWaypoints,
   buildMapTiles,
+  computeFitZoom,
   formatZoom,
   mapRectToObstacleBox,
   normalizeRotation,
@@ -55,6 +57,10 @@ import {
   zoomAroundAnchor,
 } from "../lib/trackGeometry";
 import type { Route } from "./+types/home";
+
+const DEFAULT_TRACK_ID = "skidpad";
+
+const EMPTY_DIMENSIONS = { width: 0, height: 0 };
 
 const BACKEND_HTTP_BASE_URL =
   import.meta.env.VITE_ROBOT_BACKEND_URL ?? "http://localhost:8000";
@@ -126,7 +132,11 @@ export default function Home() {
     null,
   );
   const [track, setTrack] = useState<TrackPlacement>(initialTrack);
-  const [trackScale, setTrackScale] = useState(1);
+  const [tracks, setTracks] = useState<TrackSummary[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState(DEFAULT_TRACK_ID);
+  const [preparedTrack, setPreparedTrack] = useState<PreparedTrack | null>(null);
+  const [trackLoading, setTrackLoading] = useState(false);
+  const [trackError, setTrackError] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>("navigate");
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [coneWaypoints, setConeWaypoints] = useState<ConeWaypoint[]>([]);
@@ -188,6 +198,76 @@ export default function Home() {
       tileProvider: OSM_TILE_URL,
     });
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    listTracks()
+      .then((list) => {
+        if (!isActive) {
+          return;
+        }
+        setTracks(list);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+        const message =
+          error instanceof Error ? error.message : "Failed to load tracks.";
+        addLog("warn", `Track list unavailable: ${message}`);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [addLog]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setTrackLoading(true);
+    setTrackError(null);
+
+    getTrack(selectedTrackId)
+      .then((loaded) => {
+        if (!isActive) {
+          return;
+        }
+        const prepared = prepareTrack(loaded);
+        setPreparedTrack(prepared);
+        setConeWaypoints([]);
+        setMissionFilesSaved(false);
+        setMissionFiles(null);
+        const fitZoom = computeFitZoom(
+          prepared.displayDimensions,
+          mapCenter.lat,
+        );
+        setZoom(fitZoom);
+        addLog(
+          "info",
+          `Loaded track "${prepared.name}" (${prepared.cones.length} cones), fit to z${formatZoom(fitZoom)}.`,
+        );
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+        const message =
+          error instanceof Error ? error.message : "Failed to load track.";
+        setTrackError(message);
+        addLog("error", `Track load failed: ${message}`);
+      })
+      .finally(() => {
+        if (isActive) {
+          setTrackLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [addLog, selectedTrackId]);
 
   useEffect(() => {
     let isActive = true;
@@ -313,12 +393,16 @@ export default function Home() {
     [mapCenter, zoom],
   );
   const trackResolution = metersPerPixel(mapCenter.lat, zoom);
+  const trackCones = preparedTrack?.cones ?? [];
+  const trackDimensions = preparedTrack?.dimensions ?? EMPTY_DIMENSIONS;
+  const displayDimensions =
+    preparedTrack?.displayDimensions ?? EMPTY_DIMENSIONS;
   const trackSize = useMemo(
     () => ({
-      x: (SKIDPAD.boundsWidthMeters * trackScale) / trackResolution,
-      y: (SKIDPAD.boundsHeightMeters * trackScale) / trackResolution,
+      x: displayDimensions.width / trackResolution,
+      y: displayDimensions.height / trackResolution,
     }),
-    [trackResolution, trackScale],
+    [displayDimensions, trackResolution],
   );
   const trackCenterPoint = useMemo(
     () => gpsToMapPoint(track.center, MAP_SIZE, mapCenter, zoom),
@@ -333,7 +417,7 @@ export default function Home() {
   );
   const trackWarning = useMemo(() => {
     if (trackSize.x > MAP_SIZE.x * 0.9 || trackSize.y > MAP_SIZE.y * 0.9) {
-      return "Current zoom makes the scaled skidpad larger than the visible map.";
+      return "Current zoom makes the scaled track larger than the visible map.";
     }
 
     if (
@@ -342,14 +426,14 @@ export default function Home() {
       trackTopLeft.x > MAP_SIZE.x ||
       trackTopLeft.y > MAP_SIZE.y
     ) {
-      return "Skidpad overlay is outside the visible map area.";
+      return "Track overlay is outside the visible map area.";
     }
 
     return null;
   }, [trackSize, trackTopLeft]);
   const previewConeWaypoints = useMemo(
-    () => buildConeWaypoints(track, trackScale, zoom),
-    [track, trackScale, zoom],
+    () => buildConeWaypoints(trackCones, track, zoom),
+    [trackCones, track, zoom],
   );
   const plannedConeWaypoints =
     coneWaypoints.length > 0
@@ -572,26 +656,21 @@ export default function Home() {
     addLog("info", `Track rotation set to ${rotation} degrees.`);
   };
 
-  const handleTrackScaleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const scale = clamp(
-      Number(event.target.value),
-      MIN_TRACK_SCALE,
-      MAX_TRACK_SCALE,
-    );
-    setTrackScale(scale);
-    setConeWaypoints([]);
-    invalidateMissionFiles();
-    addLog("info", `Track test scale set to ${Math.round(scale * 100)}%.`);
-  };
-
   const handleGenerateRoute = () => {
-    const waypoints = buildConeWaypoints(track, trackScale, zoom);
+    const waypoints = buildConeWaypoints(trackCones, track, zoom);
     setConeWaypoints(waypoints);
     invalidateMissionFiles();
     addLog("info", `Generated ${waypoints.length} cone spray points.`, {
       first: waypoints[0],
       last: waypoints.at(-1),
     });
+  };
+
+  const handleSelectTrack = (id: string) => {
+    if (!id || id === selectedTrackId) {
+      return;
+    }
+    setSelectedTrackId(id);
   };
 
   const resetTrack = () => {
@@ -601,7 +680,7 @@ export default function Home() {
     });
     setConeWaypoints([]);
     invalidateMissionFiles();
-    addLog("info", "Skidpad overlay reset to the current map center.");
+    addLog("info", "Track overlay reset to the current map center.");
   };
 
   const handleEditorModeChange = (mode: EditorMode) => {
@@ -724,8 +803,15 @@ export default function Home() {
 
   const saveMissionFiles = async () => {
     const waypoints =
-      coneWaypoints.length > 0 ? coneWaypoints : buildConeWaypoints(track, trackScale, zoom);
-    const payload = buildRosPayload(track, trackScale, waypoints, obstacleBoxes);
+      coneWaypoints.length > 0
+        ? coneWaypoints
+        : buildConeWaypoints(trackCones, track, zoom);
+    const payload = buildRosPayload(track, waypoints, obstacleBoxes, {
+      id: preparedTrack?.id ?? selectedTrackId,
+      name: preparedTrack?.name ?? selectedTrackId,
+      discipline: preparedTrack?.discipline ?? "skidpad",
+      dimensions: trackDimensions,
+    });
 
     try {
       const response = await fetch(`${BACKEND_HTTP_BASE_URL}/mission/files`, {
@@ -959,9 +1045,17 @@ export default function Home() {
           <p className="eyebrow">Formula Student ROS frontend</p>
           <h1>TrackSprayer Operator</h1>
         </div>
-        <div className="spray-status" aria-label="Spray can level">
-          <span>Spray can</span>
-          <strong>100%</strong>
+        <div className="topbar-aside">
+          <nav className="page-nav" aria-label="Primary">
+            <Link to="/" className="is-active" aria-current="page">
+              Operator
+            </Link>
+            <Link to="/tracks">Tracks</Link>
+          </nav>
+          <div className="spray-status" aria-label="Spray can level">
+            <span>Spray can</span>
+            <strong>100%</strong>
+          </div>
         </div>
       </header>
 
@@ -979,18 +1073,24 @@ export default function Home() {
           searchQuery={searchQuery}
           searchResults={searchResults}
           track={track}
-          trackScale={trackScale}
           trackWarning={trackWarning}
+          tracks={tracks}
+          selectedTrackId={selectedTrackId}
+          trackName={preparedTrack?.name ?? ""}
+          discipline={preparedTrack?.discipline ?? null}
+          trackDimensions={trackDimensions}
+          trackLoading={trackLoading}
+          trackError={trackError}
           onClearObstacles={clearObstacles}
           onEditorModeChange={handleEditorModeChange}
           onGenerateRoute={handleGenerateRoute}
           onRequestDeviceLocation={requestDeviceLocation}
+          onSelectTrack={handleSelectTrack}
           onResetTrack={resetTrack}
           onRotationChange={handleRotationChange}
           onSearchQueryChange={handleSearchQueryChange}
           onSearchSubmit={handleLocationSearch}
           onSelectLocation={selectLocation}
-          onTrackScaleChange={handleTrackScaleChange}
         />
 
         <TrackMap
@@ -1006,6 +1106,8 @@ export default function Home() {
           track={track}
           trackSize={trackSize}
           trackTopLeft={trackTopLeft}
+          trackCones={trackCones}
+          trackDimensions={displayDimensions}
           visibleObstacleBoxes={visibleObstacleBoxes}
           zoom={zoom}
           onMapPointerDown={handleMapPointerDown}

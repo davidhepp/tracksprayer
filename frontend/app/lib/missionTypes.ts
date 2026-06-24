@@ -13,21 +13,7 @@ export const SCHWEINFURT_CENTER: GpsCoordinate = {
   lat: 50.04937,
   lng: 10.22175,
 };
-export const MIN_TRACK_SCALE = 0.1;
-export const MAX_TRACK_SCALE = 1;
 export const MIN_OBSTACLE_SIZE_PX = 8;
-
-export const SKIDPAD = {
-  outerRadiusMeters: 10.775,
-  innerRadiusMeters: 7.475,
-  trackWidthMeters: 3.3,
-  circleCenterOffsetYMeters: 9.125,
-  outerDiameterMeters: 21.55,
-  innerDiameterMeters: 14.95,
-  centerDistanceMeters: 18.25,
-  boundsWidthMeters: 46,
-  boundsHeightMeters: 44,
-};
 
 export type TrackPlacement = {
   center: GpsCoordinate;
@@ -103,14 +89,15 @@ export type VisibleObstacleBox = {
 export type RosPayload = {
   generated_at: string;
   track: {
+    id: string;
+    name: string;
+    discipline: string;
     center: GpsCoordinate;
     rotation_degrees: number;
     scale: number;
     dimensions_meters: {
       width: number;
       height: number;
-      outer_diameter: number;
-      inner_diameter: number;
     };
   };
   points_to_mark: Array<{
